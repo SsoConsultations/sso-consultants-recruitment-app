@@ -53,9 +53,12 @@ if not firebase_admin._apps:
             st.error("Firebase service account key (Base64) not found in Streamlit secrets. Please configure it in .streamlit/secrets.toml")
             st.stop() # Stop the app if the secret is missing
 
+        # --- IMPORTANT: Use .strip() to remove potential leading/trailing newlines or whitespace ---
+        # This is critical for multi-line secrets read from Streamlit's secrets.toml
+        firebase_service_account_key_base64_raw = st.secrets["FIREBASE_SERVICE_ACCOUNT_KEY_BASE64"].strip()
+        
         # Decode the Base64 string back to bytes
-        encoded_key_bytes = st.secrets["FIREBASE_SERVICE_ACCOUNT_KEY_BASE64"].encode('utf-8')
-        decoded_key_bytes = base64.b64decode(encoded_key_bytes)
+        decoded_key_bytes = base64.b64decode(firebase_service_account_key_base64_raw.encode('utf-8'))
         
         # Parse the decoded bytes (which is JSON) into a Python dictionary
         FIREBASE_SERVICE_ACCOUNT_CONFIG = json.loads(decoded_key_bytes)
