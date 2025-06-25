@@ -806,7 +806,7 @@ def review_reports_page():
             print("DEBUG (review_reports_page): No reports found for this user.") # Added terminal print
     except Exception as e:
         st.error(f"Error fetching your review reports: {e}")
-        print(f"ERROR (review_reports_page): Error fetching user reports: {e}") # Added terminal print
+        print(f"ERROR (review_reports_page): Error fetching user reports: {e}") 
 
 
 # --- Admin Pages ---
@@ -940,7 +940,7 @@ def admin_user_management_page():
 
     except Exception as e:
         st.error(f"Error fetching users for admin management: {e}")
-        print(f"ERROR (admin_user_management_page): Error fetching users for admin management: {e}") # Added terminal print
+        print(f"ERROR (admin_user_management_page): Error fetching users for admin management: {e}") 
 
 
 def admin_report_management_page():
@@ -1024,7 +1024,7 @@ def admin_report_management_page():
 
     except Exception as e:
         st.error(f"Error fetching all reports for admin management: {e}")
-        print(f"ERROR (admin_report_management_page): Error fetching all reports: {e}") # Added terminal print
+        print(f"ERROR (admin_report_management_page): Error fetching all reports: {e}") 
 
 def admin_invite_member_page():
     """Admin page to invite and create new user accounts."""
@@ -1125,7 +1125,7 @@ def admin_invite_member_page():
                     status_message_placeholder.error(f"Error inviting new member: {error_message}")
             except Exception as e:
                 status_message_placeholder.error(f"An unexpected error occurred while inviting new member: {e}")
-                print(f"ERROR (admin_invite_member_page): Unexpected Python Error: {e}") # Added terminal print
+                print(f"ERROR (admin_invite_member_page): Unexpected Python Error: {e}") 
 
 def update_password_page():
     """Page for new users to update their temporary password."""
