@@ -1,0 +1,9 @@
+streamlit
+openai
+PyPDF2
+python-docx
+pandas
+openpyxl
+bcrypt
+firebase-admin
+requests
