@@ -53,12 +53,12 @@ if not firebase_admin._apps:
             st.error("Firebase service account key (Base64) not found in Streamlit secrets. Please configure it in .streamlit/secrets.toml")
             st.stop() # Stop the app if the secret is missing
 
-        # --- IMPORTANT: Use .strip() to remove potential leading/trailing newlines or whitespace ---
-        # This is critical for multi-line secrets read from Streamlit's secrets.toml
+        # --- IMPORTANT CHANGE HERE: Use base64.urlsafe_b64decode ---
+        # And .strip() to clean potential whitespace from multi-line secret
         firebase_service_account_key_base64_raw = st.secrets["FIREBASE_SERVICE_ACCOUNT_KEY_BASE64"].strip()
         
-        # Decode the Base64 string back to bytes
-        decoded_key_bytes = base64.b64decode(firebase_service_account_key_base64_raw.encode('utf-8'))
+        # Decode the Base64 string back into bytes using urlsafe_b64decode
+        decoded_key_bytes = base64.urlsafe_b64decode(firebase_service_account_key_base64_raw.encode('utf-8'))
         
         # Parse the decoded bytes (which is JSON) into a Python dictionary
         FIREBASE_SERVICE_ACCOUNT_CONFIG = json.loads(decoded_key_bytes)
@@ -1199,7 +1199,7 @@ def update_password_page():
                     update_status_placeholder.error(f"Error updating password: {error_message}")
             except Exception as e:
                 update_status_placeholder.error(f"An unexpected error occurred: {e}")
-                print(f"ERROR (update_password_page): Unexpected Python Error during password update: {e}") 
+                print(f"ERROR (update_password_page): Unexpected Python Error: {e}") 
 
 
 # --- Main Streamlit Application Logic ---
