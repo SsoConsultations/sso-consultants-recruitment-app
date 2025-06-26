@@ -38,57 +38,75 @@ st.set_page_config(
 # Firebase Storage Bucket Name (this can remain hardcoded as it's not a secret itself, but derived from project)
 FIREBASE_STORAGE_BUCKET_NAME = 'ecr-app-drive-integration.appspot.com' 
 
-# --- Firebase Initialization ---
-# Initialize Firebase Admin SDK if not already initialized to prevent 'duplicate app' errors on Streamlit reruns
-if 'db' not in st.session_state:
-    st.session_state['db'] = None
-if 'bucket' not in st.session_state:
-    st.session_state['bucket'] = None
-
-# Check if Firebase is already initialized to prevent re-initialization errors
-if not firebase_admin._apps:
+# --- Firebase Initialization Function ---
+def initialize_firebase_app():
+    """
+    Initializes the Firebase Admin SDK and stores client objects in session state.
+    This function is called only once per app run or when 'db' is not in session state.
+    """
+    print("DEBUG: Attempting to initialize Firebase app...")
     try:
         # Check if the Base64 encoded Firebase service account key is available in Streamlit secrets
         if "FIREBASE_SERVICE_ACCOUNT_KEY_BASE64" not in st.secrets:
+            print("ERROR: Firebase service account key (Base64) not found in Streamlit secrets.")
             st.error("Firebase service account key (Base64) not found in Streamlit secrets. Please configure it in .streamlit/secrets.toml")
             st.stop() # Stop the app if the secret is missing
 
-        # --- IMPORTANT CHANGE HERE: Use base64.urlsafe_b64decode ---
-        # And .strip() to clean potential whitespace from multi-line secret
+        # Use .strip() to remove potential leading/trailing newlines or whitespace from multi-line secret
         firebase_service_account_key_base64_raw = st.secrets["FIREBASE_SERVICE_ACCOUNT_KEY_BASE64"].strip()
+        print(f"DEBUG: Fetched secret. Length: {len(firebase_service_account_key_base64_raw)} chars. Starts with: {firebase_service_account_key_base64_raw[:50]}")
         
         # Decode the Base64 string back into bytes using urlsafe_b64decode
         decoded_key_bytes = base64.urlsafe_b64decode(firebase_service_account_key_base64_raw.encode('utf-8'))
-        
+        print(f"DEBUG: Base64 decoded to bytes. Length: {len(decoded_key_bytes)} bytes.")
+
         # Parse the decoded bytes (which is JSON) into a Python dictionary
         FIREBASE_SERVICE_ACCOUNT_CONFIG = json.loads(decoded_key_bytes)
+        print("DEBUG: Decoded bytes parsed to JSON successfully.")
         
         # Use the dictionary to create Firebase credentials
         cred = credentials.Certificate(FIREBASE_SERVICE_ACCOUNT_CONFIG)
+        print("DEBUG: Firebase credentials created.")
         
         # Initialize the Firebase app with credentials and the correct storage bucket
-        firebase_admin.initialize_app(cred, {
-            'storageBucket': FIREBASE_STORAGE_BUCKET_NAME
-        })
-        
+        # Check firebase_admin._apps before initializing to prevent errors on reruns
+        if not firebase_admin._apps:
+            firebase_app_instance = firebase_admin.initialize_app(cred, {
+                'storageBucket': FIREBASE_STORAGE_BUCKET_NAME
+            })
+            print("DEBUG: Firebase app instance initialized.")
+        else:
+            firebase_app_instance = firebase_admin.get_app() # Get existing app instance
+            print("DEBUG: Firebase app instance already initialized, reusing.")
+
         # Get Firestore client and Storage bucket client and store them in session state
-        st.session_state['db'] = firestore.client()
-        st.session_state['bucket'] = storage.bucket(FIREBASE_STORAGE_BUCKET_NAME)
+        st.session_state['db'] = firestore.client(app=firebase_app_instance) # Pass app instance explicitly
+        st.session_state['bucket'] = storage.bucket(FIREBASE_STORAGE_BUCKET_NAME, app=firebase_app_instance) # Pass app instance explicitly
         st.success("Firebase initialized successfully!")
-        print("DEBUG: Firebase initialized successfully in terminal.") # Terminal print for debugging
-        print(f"DEBUG: Initialized with Storage Bucket: {st.session_state['bucket'].name}") # Verify bucket name
+        print("DEBUG: Firebase initialized successfully and clients stored in session state.")
+        print(f"DEBUG: Session state 'db' is now: {type(st.session_state['db'])}")
+        print(f"DEBUG: Session state 'bucket' is now: {type(st.session_state['bucket'])}")
+
     except Exception as e:
         # Provide detailed error message for troubleshooting Firebase initialization issues
+        print(f"ERROR: Error during Firebase initialization: {e}")
         st.error(f"Error initializing Firebase: {e}.")
         st.error("Please ensure your Streamlit secrets are correctly configured for Firebase. Specifically check 'FIREBASE_SERVICE_ACCOUNT_KEY_BASE64'.")
-        print(f"ERROR: Firebase initialization failed: {e}") # Terminal print for debugging
         st.stop() # Stop the app execution if Firebase fails to initialize
+
+# --- Ensure Firebase is initialized and clients are available in session state ---
+# This ensures 'db' and 'bucket' are always set before they are used.
+if 'db' not in st.session_state or st.session_state['db'] is None:
+    print("DEBUG: 'db' not found in session state or is None. Calling initialize_firebase_app().")
+    initialize_firebase_app()
+else:
+    print("DEBUG: 'db' already exists in session state. Firebase previously initialized.")
 
 # Assign db and bucket from session_state for easier use in functions
 db = st.session_state['db']
 bucket = st.session_state['bucket']
 
-# Initialize OpenAI client
+# --- Initialize OpenAI client ---
 try:
     # Check if OpenAI API Key is available in Streamlit secrets
     if "OPENAI_API_KEY" not in st.secrets:
@@ -96,6 +114,7 @@ try:
         st.stop()
     # Initialize the OpenAI client using the API key from secrets
     openai_client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+    print("DEBUG: OpenAI client initialized successfully.")
 except Exception as e:
     st.error(f"OpenAI client not initialized: {e}. Please check your OPENAI_API_KEY in Streamlit secrets.")
     print(f"ERROR: OpenAI client initialization failed: {e}") # Terminal print for debugging
@@ -429,7 +448,7 @@ def register_user(email, password, username):
         user = auth.create_user(email=email, password=password, display_name=username)
         
         # Store additional user info in Firestore
-        st.session_state['db'].collection('users').document(user.uid).set({
+        db.collection('users').document(user.uid).set({ # Use global 'db' here
             'email': email,
             'username': username,
             'created_at': firestore.SERVER_TIMESTAMP,
@@ -453,10 +472,17 @@ def login_user(email, password, login_as_admin_attempt=False):
     """Logs in a user by verifying their existence in Firebase Auth using Admin SDK.
     Also fetches user's admin status from Firestore and enforces login type.
     Redirects to password update if first login is required."""
+    
+    # Ensure db is not None before proceeding
+    if db is None:
+        print("ERROR: login_user called but 'db' is None. Firebase initialization failed or was not completed.")
+        st.error("Application error: Database connection not established. Please refresh or contact support.")
+        return False
+
     try:
         print(f"DEBUG (login_user): Attempting to log in {email}") # Added terminal print
         user = auth.get_user_by_email(email)
-        user_doc_ref = st.session_state['db'].collection('users').document(user.uid)
+        user_doc_ref = db.collection('users').document(user.uid) # Use global 'db' here
         user_doc = user_doc_ref.get()
 
         if user_doc.exists:
@@ -469,11 +495,11 @@ def login_user(email, password, login_as_admin_attempt=False):
             if login_as_admin_attempt and not is_user_admin_in_db:
                 st.error("This account does not have administrator privileges. Please log in as a regular user.")
                 print(f"DEBUG (login_user): Admin login attempt for non-admin user {email} denied.") # Added terminal print
-                return
+                return False # Return False here as login was not truly successful for the requested type
             elif not login_as_admin_attempt and is_user_admin_in_db:
                 st.error("This account has administrator privileges. Please log in as an administrator.")
                 print(f"DEBUG (login_user): User login attempt for admin user {email} denied.") # Added terminal print
-                return
+                return False # Return False here as login was not truly successful for the requested type
             
             # If first login is required, redirect to password update page
             if first_login_required:
@@ -484,7 +510,7 @@ def login_user(email, password, login_as_admin_attempt=False):
                 print(f"DEBUG (login_user): Redirecting {email} to password update page.") # Added terminal print
                 time.sleep(1)
                 st.rerun()
-                return
+                return True # Indicate successful redirection/login process initiation
 
             # Proceed with normal login if first login is not required
             st.session_state['logged_in'] = True
@@ -501,9 +527,11 @@ def login_user(email, password, login_as_admin_attempt=False):
             time.sleep(1) # Short delay for message to be visible
             st.session_state['current_page'] = 'Dashboard' # Ensure correct page after successful login
             st.rerun() 
+            return True # Successful login
         else:
             st.error("User profile not found in Firestore. Please ensure your account is set up correctly.")
             print(f"ERROR (login_user): User profile for {email} not found in Firestore.") # Added terminal print
+            return False
     except exceptions.FirebaseError as e: 
         st.error(f"Login failed: {e}")
         print(f"ERROR (login_user): Firebase Error during login for {email}: {e}") # Added terminal print
@@ -514,10 +542,12 @@ def login_user(email, password, login_as_admin_attempt=False):
             st.error("Invalid email format.")
         else:
             st.error(f"An authentication error occurred: {e}. Please try again.")
+        return False
     except Exception as e:
         st.error(f"An unexpected error occurred during login: {e}")
         print(f"ERROR (login_user): Unexpected Python Error during login for {email}: {e}") # Added terminal print
         time.sleep(2)
+        return False
 
 def logout_user():
     """Logs out the current user by resetting session state."""
@@ -693,7 +723,14 @@ def save_report_on_download(filename, docx_buffer, ai_result, jd_original_name, 
     """Saves the report to Firebase Storage and Firestore metadata."""
     st.info("Attempting to save report to cloud...") # New info message in UI
     print("DEBUG (save_report_on_download): Function started. User UID:", st.session_state.get('user_uid', 'N/A')) # Terminal print
-    print(f"DEBUG (save_report_on_download): Current bucket name from session_state: {st.session_state['bucket'].name}") # NEW DEBUG PRINT
+    
+    # Ensure db and bucket are not None before use
+    if db is None or bucket is None:
+        st.error("Application error: Firebase clients (db or bucket) not available for saving.")
+        print("ERROR (save_report_on_download): Firebase clients are None. Cannot save report.")
+        return
+
+    print(f"DEBUG (save_report_on_download): Current bucket name from session_state: {bucket.name}") # Use global 'bucket'
     
     storage_file_path = f"jd_cv_reports/{st.session_state['user_uid']}/{filename}"
     download_url = None # Initialize download_url
@@ -701,7 +738,7 @@ def save_report_on_download(filename, docx_buffer, ai_result, jd_original_name, 
     try:
         # 1. Upload DOCX to Firebase Storage
         print(f"DEBUG (save_report_on_download): Attempting to upload file to Storage at: {storage_file_path}") # Terminal print
-        blob = st.session_state['bucket'].blob(storage_file_path)
+        blob = bucket.blob(storage_file_path) # Use global 'bucket'
         docx_buffer.seek(0) # Ensure buffer is at the beginning before uploading
         blob.upload_from_string(docx_buffer.getvalue(), content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
         
@@ -727,7 +764,7 @@ def save_report_on_download(filename, docx_buffer, ai_result, jd_original_name, 
 
         # 3. Save metadata to Firestore
         try:
-            st.session_state['db'].collection('jd_cv_reports').add(report_metadata)
+            db.collection('jd_cv_reports').add(report_metadata) # Use global 'db' here
             st.success("Report metadata saved to Firestore successfully!") # Final UI success message
             print("DEBUG (save_report_on_download): Report metadata successfully added to Firestore.") # Terminal print
         except exceptions.FirebaseError as firestore_e: # Catch specific Firebase errors
@@ -770,16 +807,19 @@ def review_reports_page():
     st.write("Here you can find a history of your AI-generated comparative analysis reports.")
     print("DEBUG (review_reports_page): Displaying review reports page.") # Added terminal print
 
-    # Ensure user is logged in before trying to fetch reports
-    if not st.session_state['logged_in'] or not st.session_state['user_uid']:
+    # Ensure user is logged in and db is not None before trying to fetch reports
+    if not st.session_state['logged_in'] or not st.session_state['user_uid'] or db is None:
         st.info("Please log in to view your past reports.")
-        print("DEBUG (review_reports_page): User not logged in, cannot fetch reports.") # Added terminal print
+        if db is None:
+            print("ERROR: review_reports_page called but 'db' is None.")
+        else:
+            print("DEBUG (review_reports_page): User not logged in, cannot fetch reports.") # Added terminal print
         return
 
     try:
         # Fetch reports specific to the logged-in user from the 'jd_cv_reports' collection
         print(f"DEBUG (review_reports_page): Fetching reports for UID: {st.session_state['user_uid']}") # Added terminal print
-        reports_ref = st.session_state['db'].collection('jd_cv_reports').where('user_uid', '==', st.session_state['user_uid']).order_by('review_date', direction=firestore.Query.DESCENDING)
+        reports_ref = db.collection('jd_cv_reports').where('user_uid', '==', st.session_state['user_uid']).order_by('review_date', direction=firestore.Query.DESCENDING) # Use global 'db'
         docs = reports_ref.stream() # Get all matching documents
 
         reviews_data = []
@@ -827,11 +867,17 @@ def admin_user_management_page():
     st.write("View, manage roles, or delete users.")
     print("DEBUG (admin_user_management_page): Displaying user management page.") # Added terminal print
 
+    # Ensure db is not None before proceeding
+    if db is None:
+        print("ERROR: admin_user_management_page called but 'db' is None.")
+        st.error("Application error: Database connection not established. Please refresh or contact support.")
+        return
+
     users_data = []
     try:
         # Fetch all users from Firestore
         print("DEBUG (admin_user_management_page): Fetching all users from Firestore.") # Added terminal print
-        users_ref = st.session_state['db'].collection('users')
+        users_ref = db.collection('users') # Use global 'db'
         docs = users_ref.stream()
 
         for doc in docs:
@@ -863,7 +909,7 @@ def admin_user_management_page():
                             print(f"DEBUG (admin_user_management_page): Toggling admin status for {user_email_toggle}.") # Added terminal print
                             # Get user by email to find UID
                             user_record = auth.get_user_by_email(user_email_toggle)
-                            user_doc_ref = st.session_state['db'].collection('users').document(user_record.uid)
+                            user_doc_ref = db.collection('users').document(user_record.uid) # Use global 'db'
                             user_doc = user_doc_ref.get()
                             if user_doc.exists:
                                 current_admin_status = user_doc.to_dict().get('isAdmin', False)
@@ -904,14 +950,15 @@ def admin_user_management_page():
                                 user_record = auth.get_user_by_email(user_email_delete)
                                 
                                 # Delete all reports associated with this user from Firestore and Storage
-                                user_reports_ref = st.session_state['db'].collection('jd_cv_reports').where('user_uid', '==', user_record.uid)
+                                user_reports_ref = db.collection('jd_cv_reports').where('user_uid', '==', user_record.uid) # Use global 'db'
                                 user_reports_docs = user_reports_ref.stream()
                                 for report_doc in user_reports_docs:
                                     report_data = report_doc.to_dict()
                                     storage_file_path = f"jd_cv_reports/{report_data['user_uid']}/{report_data['outputDocFileName']}"
                                     try:
-                                        blob_to_delete = st.session_state['bucket'].blob(storage_file_path)
+                                        blob_to_delete = bucket.blob(storage_file_path) # Use global 'bucket'
                                         blob_to_delete.delete()
+                                        st.session_state['bucket'].blob(storage_file_path) # Use global 'bucket'
                                         print(f"DEBUG (admin_user_management_page): Deleted Storage file for {user_email_delete}: {report_data['outputDocFileName']}.") # Added terminal print
                                     except Exception as storage_e:
                                         st.warning(f"Could not delete storage file for {user_email_delete}: {report_data['outputDocFileName']}. Error: {storage_e}")
@@ -922,7 +969,7 @@ def admin_user_management_page():
                                 # Delete user from Firebase Authentication
                                 auth.delete_user(user_record.uid)
                                 # Delete user's profile from Firestore
-                                st.session_state['db'].collection('users').document(user_record.uid).delete()
+                                db.collection('users').document(user_record.uid).delete() # Use global 'db'
                                 
                                 st.success(f"User {user_email_delete} and all their associated data deleted successfully.")
                                 print(f"DEBUG (admin_user_management_page): User {user_email_delete} fully deleted.") # Added terminal print
@@ -952,11 +999,17 @@ def admin_report_management_page():
     st.write("View and delete all AI-generated comparative analysis reports.")
     print("DEBUG (admin_report_management_page): Displaying report management page.") # Added terminal print
 
+    # Ensure db is not None before proceeding
+    if db is None:
+        print("ERROR: admin_report_management_page called but 'db' is None.")
+        st.error("Application error: Database connection not established. Please refresh or contact support.")
+        return
+
     all_reports_data = []
     try:
         # Fetch ALL reports from Firestore (no user filter)
         print("DEBUG (admin_report_management_page): Fetching all reports from Firestore.") # Added terminal print
-        reports_ref = st.session_state['db'].collection('jd_cv_reports').order_by('review_date', direction=firestore.Query.DESCENDING)
+        reports_ref = db.collection('jd_cv_reports').order_by('review_date', direction=firestore.Query.DESCENDING) # Use global 'db'
         docs = reports_ref.stream()
 
         for doc in docs:
@@ -992,7 +1045,7 @@ def admin_report_management_page():
                 if report_id_to_delete:
                     try:
                         print(f"DEBUG (admin_report_management_page): Deleting report {report_id_to_delete}.") # Added terminal print
-                        report_doc_ref = st.session_state['db'].collection('jd_cv_reports').document(report_id_to_delete)
+                        report_doc_ref = db.collection('jd_cv_reports').document(report_id_to_delete) # Use global 'db'
                         report_doc = report_doc_ref.get()
 
                         if report_doc.exists:
@@ -1000,7 +1053,7 @@ def admin_report_management_page():
                             storage_file_path = f"jd_cv_reports/{report_data['user_uid']}/{report_data['outputDocFileName']}"
                             
                             # Delete from Storage
-                            blob_to_delete = st.session_state['bucket'].blob(storage_file_path)
+                            blob_to_delete = bucket.blob(storage_file_path) # Use global 'bucket'
                             blob_to_delete.delete()
                             st.success(f"File '{report_data['outputDocFileName']}' deleted from Storage.")
                             print(f"DEBUG (admin_report_management_page): Deleted Storage file: {storage_file_path}.") # Added terminal print
@@ -1034,6 +1087,12 @@ def admin_invite_member_page():
     st.title("➕ Admin: Invite New Member")
     st.write("Create new user accounts directly and assign their initial role.")
     print("DEBUG (admin_invite_member_page): Displaying invite member page.") # Added terminal print
+
+    # Ensure db is not None before proceeding
+    if db is None:
+        print("ERROR: admin_invite_member_page called but 'db' is None.")
+        st.error("Application error: Database connection not established. Please refresh or contact support.")
+        return
 
     # Using st.empty() to control message display more explicitly
     status_message_placeholder = st.empty()
@@ -1097,7 +1156,7 @@ def admin_invite_member_page():
                     )
                     
                     # Store user profile in Firestore with assigned role AND firstLoginRequired flag
-                    st.session_state['db'].collection('users').document(user_record.uid).set({
+                    db.collection('users').document(user_record.uid).set({ # Use global 'db'
                         'email': new_user_email_input,
                         'username': new_username_input,
                         'created_at': firestore.SERVER_TIMESTAMP,
@@ -1135,6 +1194,12 @@ def update_password_page():
     st.title("🔑 Update Your Password")
     st.write("As a new member, please set your personal password to continue.")
     print("DEBUG (update_password_page): Displaying update password page.") # Added terminal print
+
+    # Ensure db is not None before proceeding
+    if db is None:
+        print("ERROR: update_password_page called but 'db' is None.")
+        st.error("Application error: Database connection not established. Please refresh or contact support.")
+        return
 
     if not st.session_state['new_user_uid_for_pw_reset']:
         st.warning("You must be logged in with a temporary account to access this page. Please log in.")
@@ -1182,7 +1247,7 @@ def update_password_page():
                     )
 
                     # Update firstLoginRequired to False in Firestore
-                    user_doc_ref = st.session_state['db'].collection('users').document(st.session_state['new_user_uid_for_pw_reset'])
+                    user_doc_ref = db.collection('users').document(st.session_state['new_user_uid_for_pw_reset']) # Use global 'db'
                     user_doc_ref.update({'firstLoginRequired': False})
 
                     update_status_placeholder.success("Password updated successfully! Please log in with your new password.")
