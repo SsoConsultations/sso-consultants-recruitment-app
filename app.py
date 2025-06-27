@@ -168,41 +168,43 @@ st.markdown(
     }
 
     /* Centering content within a column (applied to Streamlit's main block) */
+    /* *** ADJUSTED FOR BETTER VISIBILITY OF HEADER ELEMENTS *** */
     .st-emotion-cache-16txt4v { 
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: flex-start; /* Align from top, not center */
-        min-height: 90vh; /* Ensure content pushes footer down on shorter pages */
-        padding-top: 0; 
+        justify-content: flex-start; 
+        min-height: 90vh; 
+        padding-top: 4rem; /* Increased padding top for main content */
     }
 
     /* Styling for the central main title */
     .main-app-title {
         color: #333333; 
-        font-size: 2.8em; /* Slightly larger */
+        font-size: 2.8em; 
         font-weight: bold;
         margin-bottom: 0.5rem; 
-        padding-top: 2.5rem; /* More spacing from top of page */
+        padding-top: 0rem; /* This padding is now handled by parent container's padding-top */
     }
     .sub-app-title {
-        color: #555555; /* Darker grey for subtitle */
-        font-size: 1.3em; /* Slightly larger subtitle */
-        margin-bottom: 2.5rem; /* More spacing below subtitle */
+        color: #555555; 
+        font-size: 1.3em; 
+        margin-bottom: 2.5rem; 
     }
 
     /* Top-right logo container */
     .top-right-logo {
         position: fixed; 
-        top: 20px; /* Increased distance from top */
-        right: 20px; /* Increased distance from right */
-        z-index: 1000; 
+        top: 10px; /* Adjusted closer to top */
+        right: 10px; /* Adjusted closer to right */
+        z-index: 9999; /* Increased z-index for maximum visibility */
         background-color: rgba(255, 255, 255, 0.0); 
         padding: 5px;
         border-radius: 8px;
+        border: 2px solid red; /* *** DEBUGGING BORDER - REMOVE LATER *** */
     }
     .top-right-logo img {
-        width: 100px; /* Slightly larger logo size */
+        width: 100px; 
         height: auto;
     }
 
@@ -211,27 +213,27 @@ st.markdown(
         align-items: flex-start; 
         padding-top: 2rem; 
         text-align: left;
-        margin-left: 1rem; /* Add some left margin for content when sidebar is present */
-        margin-right: 1rem; /* Add some right margin */
-        width: calc(100% - 2rem); /* Adjust width to fit margins */
+        margin-left: 1rem; 
+        margin-right: 1rem; 
+        width: calc(100% - 2rem); 
     }
     .logged-in-main-content .st-emotion-cache-16txt4v .stForm {
         width: auto; 
-        max-width: none; /* Remove max-width for forms in logged-in pages */
+        max-width: none; 
     }
     .logged-in-main-content h1, .logged-in-main-content h2, .logged-in-main-content h3 {
-        text-align: left; /* Ensure headings are left-aligned when logged in */
+        text-align: left; 
         color: #333333;
     }
 
     /* Hide the default Streamlit hamburger menu button and Share button */
-    .css-hi6a2p { /* Hamburger menu button */
+    .css-hi6a2p { 
         display: none !important;
     }
-    .css-1dp5x4b { /* Share button in header */
+    .css-1dp5x4b { 
         display: none !important;
     }
-    .css-1gh6j8x { /* Top right buttons container (share, settings) */
+    .css-1gh6j8x { 
         display: none !important;
     }
     </style>
@@ -445,7 +447,7 @@ def get_comparative_ai_analysis(jd_text, all_cv_data):
     }
 
     Ensure "Match %" is a string.
-    Ensure "Ranking" is a numerical rank string (e.g., "1", "2") without any emoji symbols (like 🥇, 🥈, �).
+    Ensure "Ranking" is a numerical rank string (e.g., "1", "2") without any emoji symbols (like 🥇, 🥈, 🥉).
     For "criteria_observations", dynamically create columns for each candidate using their names (e.g., "Gauri Deshmukh", "Himanshukulkarni"). Use ✅ for good fit, ❌ for not a fit, ⚠️ for partial fit.
     Make sure all text fields are within the string limits of JSON.
     The "Candidate Name" in "candidate_evaluations" and the dynamic column headers in "criteria_observations" should be derived from the provided filenames (e.g., "Gauri CV.pdf" -> "Gauri").
@@ -863,7 +865,7 @@ def upload_jd_cv_page():
 
 def save_report_on_download(filename, docx_buffer, ai_result, jd_original_name, cv_original_names):
     """Saves the report to Firebase Storage and Firestore metadata."""
-    st.info("Attempting to save report to cloud...") 
+    st.info("Attempting to save report to cloud... (This message will disappear shortly)") # Added clarification 
     print("DEBUG (save_report_on_download): Function started. User UID:", st.session_state.get('user_uid', 'N/A')) 
     
     if db is None or bucket is None:
