@@ -185,24 +185,25 @@ st.markdown(
 
     /* Styling for the central main title */
     .main-app-title {
-        color: #333333; /* Dark charcoal for main title */
+        color: #0D47A1 !important; /* Deep Dark Blue for main title */
         font-size: 2.8em; 
         font-weight: bold;
         margin-bottom: 0.5rem; 
         text-align: center; /* Explicitly center align */
     }
     .sub-app-title {
-        color: #333333; /* Dark charcoal for subtitle */
+        color: #0D47A1 !important; /* Deep Dark Blue for subtitle */
         font-size: 1.3em; 
         margin-bottom: 2.5rem; 
         text-align: center; /* Explicitly center align */
     }
     /* Specific styling for the H3 "Login as Administrator/User" title */
-    .st-emotion-cache-nahz7x { /* Target Streamlit's h3 class if custom styles don't apply */
-        color: #333333; /* Dark charcoal for the login mode title */
+    .st-emotion-cache-nahz7x { /* Target Streamlit's h3 class */
+        color: #0D47A1 !important; /* Deep Dark Blue for the login mode title */
     }
-    .st-emotion-cache-nahz7x + h3 { /* More specific selector if needed for the login form h3 */
-        color: #333333 !important;
+    /* If the above is not specific enough, this targets h3 right after a specific Streamlit container */
+    .st-emotion-cache-nahz7x + h3 { 
+        color: #0D47A1 !important;
     }
 
 
