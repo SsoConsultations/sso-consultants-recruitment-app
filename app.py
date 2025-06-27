@@ -74,8 +74,9 @@ st.markdown(
     }
 
     /* Customizing the sidebar - Now forcing to light gray */
-    .css-1lcbmhc, /* Sidebar container */
-    .css-1lcbmhc > section[data-testid="stSidebarContent"] { /* Targeting the inner sidebar content area as well */
+    /* Targeting both the main sidebar container and its inner content area for robustness */
+    .css-1lcbmhc, /* Main sidebar container */
+    .css-1lcbmhc > section[data-testid="stSidebarContent"] { /* Inner content area */
         background-color: #F0F2F5 !important; /* FORCING Very Light Gray sidebar background - CRITICAL */
         color: #000000 !important; /* Default text in sidebar to black */
     }
@@ -962,7 +963,7 @@ def save_report_on_download(filename, docx_buffer, ai_result, jd_original_name, 
         print(f"DEBUG (save_report_on_download): Attempting to upload file to Storage at: {storage_file_path}") 
         blob = bucket.blob(storage_file_path) 
         docx_buffer.seek(0) 
-        blob.upload_from_string(docx_buffer.getvalue(), content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        blob.upload_from_string(docx_buffer.getvalue(), content_type="application/vnd.openxmlformats-officedocument.wordprocessingprocessingml.document")
         
         blob.make_public() 
         download_url = blob.public_url
@@ -1411,12 +1412,177 @@ def update_password_page():
         
         submit_update_button = st.form_submit_button("Update Password")
 
-        if submit_button:
-            print(f"DEBUG (main): Login form submitted for {email}.") 
-            if email and password:
-                login_user(email, password, login_as_admin_attempt=(st.session_state['login_mode'] == 'admin'))
-            else:
-                st.warning("Please enter both email and password.")
+        if submit_update_button: # This is the corrected and proper place for this logic
+            print("DEBUG (update_password_page): 'Update Password' button clicked.") 
+            if not (current_temp_password and new_password and confirm_new_password):
+                update_status_placeholder.warning("Please fill in all password fields.")
+                print("DEBUG (update_password_page): Missing password fields.") 
+                return
+            
+            if new_password != confirm_new_password:
+                update_status_placeholder.error("New passwords do not match.")
+                print("DEBUG (update_password_page): New passwords mismatch.") 
+                return
+            
+            if len(new_password) < 6:
+                update_status_placeholder.warning("New password must be at least 6 characters long.")
+                print("DEBUG (update_password_page): New password too short.") 
+                return
+
+            try:
+                with st.spinner("Updating password..."):
+                    print(f"DEBUG (update_password_page): Attempting to update password for UID: {st.session_state['new_user_uid_for_pw_reset']}") 
+                    auth.update_user(
+                        uid=st.session_state['new_user_uid_for_pw_reset'],
+                        password=new_password
+                    )
+
+                    user_doc_ref = db.collection('users').document(st.session_state['new_user_uid_for_pw_reset']) 
+                    user_doc_ref.update({'firstLoginRequired': False})
+
+                    update_status_placeholder.success("Password updated successfully! Please log in with your new password.")
+                    print("DEBUG (update_password_page): Password updated and firstLoginRequired set to False.") 
+                    time.sleep(2)
+                    logout_user() 
+
+            except exceptions.FirebaseError as e:
+                error_message = str(e)
+                print(f"ERROR (update_password_page): Firebase Error during password update: {error_message}") 
+                if "auth/weak-password" in error_message:
+                    update_status_placeholder.error("The new password is too weak. Please choose a stronger one.")
+                else:
+                    update_status_placeholder.error(f"Error updating password: {error_message}")
+            except Exception as e:
+                update_status_placeholder.error(f"An unexpected error occurred: {e}")
+                print(f"ERROR (update_password_page): Unexpected Python Error: {e}") 
+
+
+# --- Main Streamlit Application Logic ---
+
+def main():
+    """Main function to set up Streamlit page and handle navigation/authentication."""
+    # Robustly manage current_page state after login/logout
+    if st.session_state['logged_in'] and st.session_state['current_page'] in ['Login', 'Signup']:
+        st.session_state['current_page'] = 'Dashboard'
+    elif not st.session_state['logged_in'] and st.session_state['current_page'] not in ['Login', 'Signup', 'Update Password']:
+        st.session_state['current_page'] = 'Login'
+        st.session_state['login_mode'] = None 
+
+    # Conditional rendering for sidebar (only if logged in)
+    if st.session_state['logged_in']:
+        with st.sidebar:
+            # Sidebar branding
+            st.markdown("<h1 style='color: #000000 !important;'>SSO Consultants</h1>", unsafe_allow_html=True) # Forced black
+            st.markdown("<h2 style='color: #000000 !important;'>AI Recruitment Dashboard</h2>", unsafe_allow_html=True) # Forced black
+            st.markdown("---") 
+
+            st.write(f"Welcome, **{st.session_state['user_name']}**!")
+            if st.session_state['is_admin']:
+                st.markdown("<h3 style='color: #000000 !important;'>Admin Privileges Active</h3>", unsafe_allow_html=True) # Forced black
+            
+            # Navigation for logged-in users (User & Admin)
+            user_pages = ['Dashboard', 'Upload JD & CV'] 
+            admin_pages = ['Admin Dashboard', 'Admin: User Management', 'Admin: Report Management', 'Admin: Invite New Member'] 
+            
+            all_pages = user_pages 
+            if st.session_state['is_admin']:
+                all_pages.extend(['Review Reports']) # Add back for admins only
+                all_pages.extend(admin_pages)
+
+            try:
+                if st.session_state['current_page'] not in all_pages:
+                    st.session_state['current_page'] = 'Dashboard'
+                default_index = all_pages.index(st.session_state['current_page'])
+            except ValueError:
+                default_index = 0 
+
+            def update_page_selection():
+                st.session_state['current_page'] = st.session_state['sidebar_radio_selection']
+                print(f"DEBUG (sidebar_radio): Page selected: {st.session_state['current_page']}") 
+
+            page_selection = st.radio(
+                "Navigation",
+                all_pages,
+                key="sidebar_radio_selection", 
+                index=default_index,
+                on_change=update_page_selection 
+            )
+
+            st.markdown("---")
+            if st.button("Logout", key="logout_button_sidebar"): # Unique key for sidebar logout
+                logout_user()
+        
+        # Add a div to the main content area for logged-in users to override centering if needed
+        # This div should contain all the problematic grey text
+        st.markdown('<div class="logged-in-main-content">', unsafe_allow_html=True)
+        
+        # --- Render Logged-in Pages ---
+        if st.session_state['current_page'] == 'Dashboard':
+            dashboard_page()
+        elif st.session_state['current_page'] == 'Upload JD & CV':
+            upload_jd_cv_page()
+        elif st.session_state['is_admin'] and st.session_state['current_page'] == 'Review Reports': 
+            review_reports_page()
+        elif st.session_state['is_admin'] and st.session_state['current_page'] == 'Admin Dashboard':
+            admin_dashboard_page()
+        elif st.session_state['is_admin'] and st.session_state['current_page'] == 'Admin: User Management':
+            admin_user_management_page()
+        elif st.session_state['is_admin'] and st.session_state['current_page'] == 'Admin: Report Management':
+            admin_report_management_page()
+        elif st.session_state['is_admin'] and st.session_state['current_page'] == 'Admin: Invite New Member': 
+            admin_invite_member_page()
+        elif st.session_state['current_page'] == 'Update Password': 
+             update_password_page()
+        else:
+            st.error("Access Denied or Page Not Found. Please navigate using the sidebar.")
+            print(f"ERROR (main rendering): Invalid page state for logged-in user: {st.session_state['current_page']}")
+        
+        st.markdown('</div>', unsafe_allow_html=True) # Close the logged-in-main-content div
+    
+    # --- Main Content Area when NOT logged in (Login/Landing Page) ---
+    else: 
+        st.markdown("<h1 class='main-app-title'>SSO Consultants AI Recruitment System</h1>", unsafe_allow_html=True)
+        st.markdown("<p class='sub-app-title'>Streamlined Talent Acquisition with AI-Powered Insights</p>", unsafe_allow_html=True)
+        
+        # Use columns to center the buttons and potentially the login form
+        col_left_spacer_buttons, col_buttons, col_right_spacer_buttons = st.columns([1, 2, 1]) 
+        with col_buttons: # Buttons in the middle column
+            admin_col, user_col = st.columns(2)
+            with admin_col:
+                if st.button("Login as Admin", key="button_login_admin_main_page"): 
+                    st.session_state['login_mode'] = 'admin'
+                    st.session_state['current_page'] = 'Login' 
+                    print("DEBUG (main): Admin login mode selected from main page.") 
+                    st.rerun()
+            with user_col:
+                if st.button("Login as User", key="button_login_user_main_page"): 
+                    st.session_state['login_mode'] = 'user'
+                    st.session_state['current_page'] = 'Login' 
+                    print("DEBUG (main): User login mode selected from main page.") 
+                    st.rerun()
+        
+        # Display the 'Please select' message
+        col_left_spacer_info, col_info_center, col_right_spacer_info = st.columns([1, 2, 1])
+        with col_info_center:
+            if st.session_state['login_mode'] is None:
+                st.markdown("<p class='initial-info-message'>Please select 'Login as Admin' or 'Login as User' to proceed.</p>", unsafe_allow_html=True)
+        
+        # Only show login form if a mode has been selected
+        if st.session_state['login_mode']:
+            col_form_left, col_form_center, col_form_right = st.columns([1, 2, 1])
+            with col_form_center: # Form in the middle column
+                # The h3 for login form title is explicitly targeted here
+                st.markdown(f"<h3 style='text-align: center; color: #000000 !important;'>🔑 Login as {'Administrator' if st.session_state['login_mode'] == 'admin' else 'User'}</h3>", unsafe_allow_html=True) 
+                with st.form("login_form"):
+                    email = st.text_input("Email")
+                    password = st.text_input("Password", type="password")
+                    submit_button = st.form_submit_button("Login")
+                    if submit_button: # This is the correct and proper place for this logic
+                        print(f"DEBUG (main): Login form submitted for {email}.") 
+                        if email and password:
+                            login_user(email, password, login_as_admin_attempt=(st.session_state['login_mode'] == 'admin'))
+                        else:
+                            st.warning("Please enter both email and password.")
 
     # --- Custom FOOTER (Always visible at the bottom of the page) ---
     st.markdown(
