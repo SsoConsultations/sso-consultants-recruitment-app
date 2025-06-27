@@ -324,6 +324,7 @@ st.markdown(
 
 # --- Inject Top-Right Logo HTML ---
 # IMPORTANT: Updated src path to use the raw GitHub URL for the logo.png file
+# This assumes your logo.png is at https://raw.githubusercontent.com/SsoConsultations/sso-consultants-recruitment-app/main/logo.png
 st.markdown(
     f"""
     <div class="top-right-logo">
@@ -334,9 +335,11 @@ st.markdown(
 )
 
 # --- Configuration: NOW READING FROM STREAMLIT SECRETS ---
-# This is confirmed from your screenshot (image_d8fe43.png) to be the correct bucket name.
-# The issue is likely with IAM permissions for the service account, not the bucket name itself.
-FIREBASE_STORAGE_BUCKET_NAME = 'ecr-app-drive-integration.appspot.com' 
+# >>>>>>>>>>>>>>>>>>>>>>>>>> IMPORTANT: REPLACE THIS WITH YOUR NEW FIREBASE STORAGE BUCKET NAME <<<<<<<<<<<<<<<<<<<<<<<<<<<<
+# Example: 'your-new-project-id.appspot.com' or 'your-new-bucket-name.appspot.com'
+# You will get this from the Firebase Console -> Storage after creating a new bucket.
+FIREBASE_STORAGE_BUCKET_NAME = 'my-recruitment-docs.appspot.com' # <--- REPLACE THIS LINE WITH YOUR NEW BUCKET NAME
+
 
 # --- Firebase Initialization Function ---
 def initialize_firebase_app():
@@ -364,7 +367,7 @@ def initialize_firebase_app():
         
         if not firebase_admin._apps:
             firebase_app_instance = firebase_admin.initialize_app(cred, {
-                'storageBucket': FIREBASE_STORAGE_BUCKET_NAME
+                'storageBucket': FIREBASE_STORAGE_BUCKET_NAME # Using the newly defined bucket name
             })
             print("DEBUG: Firebase app instance initialized.")
         else:
@@ -372,7 +375,7 @@ def initialize_firebase_app():
             print("DEBUG: Firebase app instance already initialized, reusing.")
 
         st.session_state['db'] = firestore.client(app=firebase_app_instance) 
-        st.session_state['bucket'] = storage.bucket(FIREBASE_STORAGE_BUCKET_NAME, app=firebase_app_instance) 
+        st.session_state['bucket'] = storage.bucket(FIREBASE_STORAGE_BUCKET_NAME, app=firebase_app_instance) # Using the newly defined bucket name
         # st.success("Firebase initialized successfully!") # COMMENTED OUT FOR CLEANER UI
         print("DEBUG: Firebase initialized successfully and clients stored in session state.")
         print(f"DEBUG: Session state 'db' is now: {type(st.session_state['db'])}")
@@ -903,6 +906,7 @@ def upload_jd_cv_page():
                 if col not in df_evaluations.columns:
                     df_evaluations[col] = "N/A"
             df_evaluations = df_evaluations[expected_cols_eval]
+
             st.dataframe(df_evaluations, use_container_width=True, hide_index=True)
         
         criteria_observations_data = comparative_results.get("criteria_observations", [])
@@ -1451,8 +1455,8 @@ def update_password_page():
 
     with st.form("update_password_form"):
         current_temp_password = st.text_input("Current Temporary Password", type="password", help="The password you just used to log in.", key="current_temp_password")
-        new_password = st.text_input("New Password", type="password", help="Your new permanent password.", key="new_password")
-        confirm_new_password = st.text_input("Confirm New Password", type="password", help="Re-enter your new password to confirm.", key="new_password")
+        new_password = st.text_input("New Password", type="password", help="Your new permanent password.", key="new_password_input") # Changed key here
+        confirm_new_password = st.text_input("Confirm New Password", type="password", help="Re-enter your new password to confirm.", key="confirm_new_password_input") # Changed key here
         
         submit_update_button = st.form_submit_button("Update Password")
 
