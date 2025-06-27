@@ -323,11 +323,11 @@ st.markdown(
 )
 
 # --- Inject Top-Right Logo HTML ---
-# IMPORTANT: Updated src path to reflect logo.png in the root of the repository
+# IMPORTANT: Updated src path to use the raw GitHub URL for the logo.png file
 st.markdown(
     f"""
     <div class="top-right-logo">
-        <img src="logo.png" alt="Company Logo" onerror="this.onerror=null; this.src='https://placehold.co/100x100/A0A0A0/FFFFFF?text=Logo+Missing';">
+        <img src="https://raw.githubusercontent.com/SsoConsultations/sso-consultants-recruitment-app/main/logo.png" alt="Company Logo" onerror="this.onerror=null; this.src='https://placehold.co/100x100/A0A0A0/FFFFFF?text=Logo+Missing';">
     </div>
     """,
     unsafe_allow_html=True
