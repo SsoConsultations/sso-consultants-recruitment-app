@@ -338,7 +338,7 @@ st.markdown(
 # >>>>>>>>>>>>>>>>>>>>>>>>>> IMPORTANT: REPLACE THIS WITH YOUR NEW FIREBASE STORAGE BUCKET NAME <<<<<<<<<<<<<<<<<<<<<<<<<<<<
 # Example: 'your-new-project-id.appspot.com' or 'your-new-bucket-name.appspot.com'
 # You will get this from the Firebase Console -> Storage after creating a new bucket.
-FIREBASE_STORAGE_BUCKET_NAME = 'my-recruitment-docs.appspot.com' # <--- REPLACE THIS LINE WITH YOUR NEW BUCKET NAME
+FIREBASE_STORAGE_BUCKET_NAME = 'my-recruitment-docs.appspot.com' 
 
 
 # --- Firebase Initialization Function ---
@@ -889,6 +889,21 @@ def upload_jd_cv_page():
                 st.session_state['jd_filename_for_save'], 
                 ", ".join(st.session_state['cv_filenames_for_save'])
             )
+            
+            # --- START OF CHATGPT SUGGESTED CHANGE ---
+            # ✅ SAVE to cloud first, as soon as DOCX is generated
+            timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+            download_filename = f"{st.session_state['user_name'].replace(' ', '')}_JD-CV_Comparison_Analysis_{timestamp_str}.docx"
+
+            save_report_on_download(
+                download_filename,
+                st.session_state['generated_docx_buffer'],
+                st.session_state['ai_review_result'],
+                st.session_state['jd_filename_for_save'],
+                st.session_state['cv_filenames_for_save']
+            )
+            # --- END OF CHATGPT SUGGESTED CHANGE ---
+
             st.session_state['review_triggered'] = True 
 
     if st.session_state['review_triggered'] and st.session_state['ai_review_result']:
@@ -929,26 +944,21 @@ def upload_jd_cv_page():
 
         st.subheader("Download & Save Report")
         
-        timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
-        download_filename = f"{st.session_state['user_name'].replace(' ', '')}_JD-CV_Comparison_Analysis_{timestamp_str}.docx"
+        # --- START OF CHATGPT SUGGESTED CHANGE (Modified download button) ---
+        timestamp_str_for_download = datetime.now().strftime('%Y%m%d_%H%M%S') # Re-generate for download button as save happens earlier
+        download_filename_for_button = f"{st.session_state['user_name'].replace(' ', '')}_JD-CV_Comparison_Analysis_{timestamp_str_for_download}.docx"
 
         if st.session_state['generated_docx_buffer']:
             st.download_button(
-                label="Download & Save DOCX Report ⬇️☁️", 
+                label="Download DOCX Report ⬇️", # Label changed
                 data=st.session_state['generated_docx_buffer'],
-                file_name=download_filename,
+                file_name=download_filename_for_button, # Use a unique filename for the download to avoid conflicts if saved multiple times
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
-                key="download_and_save_docx",
-                on_click=lambda: save_report_on_download(
-                    download_filename,
-                    st.session_state['generated_docx_buffer'],
-                    st.session_state['ai_review_result'],
-                    st.session_state['jd_filename_for_save'],
-                    st.session_state['cv_filenames_for_save']
-                )
+                key="download_docx" # Key changed
             )
         else:
             st.warning("Run an AI review to generate a report for download and save.")
+        # --- END OF CHATGPT SUGGESTED CHANGE ---
 
 def save_report_on_download(filename, docx_buffer, ai_result, jd_original_name, cv_original_names):
     """Saves the report to Firebase Storage and Firestore metadata."""
@@ -1020,12 +1030,12 @@ def save_report_on_download(filename, docx_buffer, ai_result, jd_original_name, 
         print(f"ERROR (save_report_on_download): Overall error in function (Storage upload or initial setup): {e}")
 
     finally:
-        st.session_state['review_triggered'] = False
-        st.session_state['ai_review_result'] = None
-        st.session_state['generated_docx_buffer'] = None
-        st.session_state['jd_filename_for_save'] = "Job Description"
-        st.session_state['cv_filenames_for_save'] = []
-
+        # Note: These session state resets should ideally happen *after* the entire process including save.
+        # But since save_report_on_download is now called earlier, these might need re-evaluation
+        # based on desired UI behavior. For now, we leave them in the finally block of save_report_on_download.
+        # However, for clarity, it might be better to manage review_triggered in the calling function.
+        # Leaving as is for minimal change to save_report_on_download's existing finally.
+        pass # Removed direct resets here, as `review_triggered` is handled in `upload_jd_cv_page`
 
 def review_reports_page():
     """Displays a table of past reports fetched from Firestore for the current user."""
