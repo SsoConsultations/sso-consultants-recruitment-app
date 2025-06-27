@@ -40,7 +40,7 @@ st.markdown(
     /* General body styling for light theme */
     body {
         background-color: #FFFFFF; /* Pure white background */
-        color: #333333; /* Darker text for general readability */
+        color: #333333; /* Dark charcoal for general text readability */
         font-family: 'Inter', sans-serif;
     }
 
@@ -167,7 +167,7 @@ st.markdown(
     /* Specific style for the initial info message on login page */
     .initial-info-message {
         font-size: 1.1em;
-        color: #555555; /* Medium gray for readability */
+        color: #333333; /* Dark charcoal for clear visibility */
         margin-top: 1.5rem; 
         margin-bottom: 2rem;
         font-style: italic;
@@ -185,28 +185,28 @@ st.markdown(
 
     /* Styling for the central main title */
     .main-app-title {
-        color: #1976D2; /* Blue text for main title */
+        color: #333333; /* Dark charcoal for main title */
         font-size: 2.8em; 
         font-weight: bold;
         margin-bottom: 0.5rem; 
         text-align: center; /* Explicitly center align */
     }
     .sub-app-title {
-        color: #1976D2; /* Blue text for subtitle */
+        color: #333333; /* Dark charcoal for subtitle */
         font-size: 1.3em; 
         margin-bottom: 2.5rem; 
         text-align: center; /* Explicitly center align */
     }
     /* Specific styling for the H3 "Login as Administrator/User" title */
     .st-emotion-cache-nahz7x { /* Target Streamlit's h3 class if custom styles don't apply */
-        color: #1976D2; /* Blue for the login mode title */
+        color: #333333; /* Dark charcoal for the login mode title */
     }
     .st-emotion-cache-nahz7x + h3 { /* More specific selector if needed for the login form h3 */
-        color: #1976D2 !important;
+        color: #333333 !important;
     }
 
 
-    /* Top-right logo container */
+    /* Top-right logo container - NO CHANGES PER USER INSTRUCTION */
     .top-right-logo {
         position: fixed; 
         top: 10px; 
@@ -215,7 +215,7 @@ st.markdown(
         background-color: rgba(255, 255, 255, 0.0); 
         padding: 5px;
         border-radius: 8px;
-        border: 2px solid red; /* *** DEBUGGING BORDER - REMOVE LATER *** */
+        border: 2px solid red; /* *** DEBUGGING BORDER - RETAINED AS REQUESTED *** */
     }
     .top-right-logo img {
         width: 100px; 
@@ -266,7 +266,7 @@ st.markdown(
 )
 
 # --- Inject Top-Right Logo HTML ---
-# IMPORTANT: src path is 'app/static/logo.png'. Keeping red border for debugging.
+# IMPORTANT: src path is 'app/static/logo.png'. Red border kept for debugging.
 st.markdown(
     f"""
     <div class="top-right-logo">
@@ -1513,7 +1513,7 @@ def main():
             col_form_left, col_form_center, col_form_right = st.columns([1, 2, 1])
             with col_form_center: # Form in the middle column
                 # The h3 for login form title
-                st.markdown(f"<h3 style='text-align: center; color: #1976D2;'>🔑 Login as {'Administrator' if st.session_state['login_mode'] == 'admin' else 'User'}</h3>", unsafe_allow_html=True) 
+                st.markdown(f"<h3 style='text-align: center; color: #333333;'>🔑 Login as {'Administrator' if st.session_state['login_mode'] == 'admin' else 'User'}</h3>", unsafe_allow_html=True) 
                 with st.form("login_form"):
                     email = st.text_input("Email")
                     password = st.text_input("Password", type="password")
