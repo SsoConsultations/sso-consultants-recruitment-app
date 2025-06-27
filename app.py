@@ -28,7 +28,145 @@ from docx.enum.table import WD_ALIGN_VERTICAL
 st.set_page_config(
     page_title="SSO Consultants AI Recruitment",
     page_icon="🔍",
-    layout="wide" 
+    layout="centered" # Changed layout to 'centered' for better default centering
+)
+
+# --- Custom CSS for Styling ---
+# This applies global styles to the Streamlit app to match the desired look.
+st.markdown(
+    """
+    <style>
+    /* General body styling for light theme */
+    body {
+        background-color: #f0f2f6; /* Light gray background */
+        color: #333333; /* Darker text for readability */
+        font-family: 'Inter', sans-serif;
+    }
+
+    /* Main container styling to simulate a white card in the center */
+    .stApp > header {
+        display: none; /* Hide Streamlit header */
+    }
+
+    /* Target main content area directly if layout is 'centered' */
+    .css-18e3th9 { /* Main content container - this class might change with Streamlit updates */
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+    /* Customizing the sidebar */
+    .css-1lcbmhc { /* Sidebar container */
+        background-color: #212529; /* Darker sidebar background */
+        color: white;
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+    }
+    .css-1lcbmhc .stRadio > label {
+        color: white; /* Radio button labels in sidebar */
+    }
+    .css-1lcbmhc .stButton > button {
+        background-color: #007bff; /* Blue button in sidebar */
+        color: white;
+        border-radius: 0.5rem;
+        border: none;
+        padding: 0.5rem 1rem;
+    }
+    .css-1lcbmhc h1, .css-1lcbmhc h2, .css-1lcbmhc h3, .css-1lcbmhc h4, .css-1lcbmhc h5, .css-1lcbmhc h6 {
+        color: white; /* Sidebar headings */
+    }
+    .css-1lcbmhc p {
+        color: #cccccc; /* Sidebar paragraphs */
+    }
+
+    /* Styling for the main login buttons (Login as Admin, Login as User) */
+    .stButton > button {
+        background-color: #007bff; /* Primary blue */
+        color: white;
+        border-radius: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        font-size: 1.1rem;
+        border: none;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+        margin: 0.5rem; /* Add margin between buttons */
+    }
+    .stButton > button:hover {
+        background-color: #0056b3; /* Darker blue on hover */
+        transform: translateY(-2px);
+    }
+
+    /* Styling for forms and inputs */
+    .stForm {
+        padding: 2rem;
+        border-radius: 0.75rem;
+        background-color: white; /* White background for the form card */
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+        margin-top: 2rem;
+        width: 100%; /* Ensure form takes full width of its column */
+    }
+    .stTextInput > label, .stSelectbox > label, .stRadio > label {
+        font-weight: bold;
+        color: #333333;
+    }
+    .stTextInput input[type="text"], .stTextInput input[type="password"] {
+        border-radius: 0.5rem;
+        border: 1px solid #ced4da;
+        padding: 0.75rem 1rem;
+        width: 100%;
+    }
+    .stTextInput input:focus {
+        border-color: #007bff;
+        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+
+    /* Success/Error/Warning messages */
+    .stAlert {
+        border-radius: 0.5rem;
+    }
+    .stAlert.success {
+        background-color: #d4edda;
+        color: #155724;
+        border-color: #c3e6cb;
+    }
+    .stAlert.error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border-color: #f5c6cb;
+    }
+    .stAlert.warning {
+        background-color: #fff3cd;
+        color: #856404;
+        border-color: #ffeeba;
+    }
+
+    /* Centering content within columns */
+    .center-content {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        height: 100%; /* Important for vertical centering within its container */
+    }
+
+    /* Styling for the central main title */
+    .main-app-title {
+        color: #333333; /* Dark text for light background */
+        font-size: 2.5em; /* Larger font size */
+        font-weight: bold;
+        margin-bottom: 1.5rem;
+        padding-top: 1rem;
+    }
+    .sub-app-title {
+        color: #666666;
+        font-size: 1.2em;
+        margin-bottom: 2rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
 )
 
 # --- Configuration: NOW READING FROM STREAMLIT SECRETS ---
@@ -57,6 +195,7 @@ def initialize_firebase_app():
         print(f"DEBUG: Fetched secret. Length: {len(firebase_service_account_key_base64_raw)} chars. Starts with: {firebase_service_account_key_base64_raw[:50]}")
         
         # Decode the Base64 string back into bytes using urlsafe_b64decode
+        # It's important that the secret has been encoded using urlsafe_b64encode
         decoded_key_bytes = base64.urlsafe_b64decode(firebase_service_account_key_base64_raw.encode('utf-8'))
         print(f"DEBUG: Base64 decoded to bytes. Length: {len(decoded_key_bytes)} bytes.")
 
@@ -1281,9 +1420,14 @@ def main():
 
     # --- Sidebar for Logo, Title, and Navigation ---
     with st.sidebar:
-        # st.image("path/to/your/sso_logo.png", use_column_width=True) # Uncomment and replace with your logo path
-        st.title("SSO Consultants")
-        st.subheader("AI Recruitment Dashboard")
+        # Logo at the top of the sidebar
+        try:
+            st.image("logo.png", width=150) # Adjust width as needed for your logo
+        except FileNotFoundError:
+            st.warning("Logo file 'logo.png' not found. Please ensure it's in the root directory of your repo.")
+        
+        st.title("SSO Consultants") # Retain as a branding title in sidebar
+        st.subheader("AI Recruitment Dashboard") # Retain as a branding subheader
         st.markdown("---") # Horizontal rule for separation
 
         # Conditional rendering based on login status
@@ -1293,11 +1437,12 @@ def main():
                 st.markdown("### Admin Privileges Active")
             
             # Navigation for logged-in users (User & Admin)
-            user_pages = ['Dashboard', 'Upload JD & CV', 'Review Reports']
+            user_pages = ['Dashboard', 'Upload JD & CV'] # Removed 'Review Reports' for non-admins
             admin_pages = ['Admin Dashboard', 'Admin: User Management', 'Admin: Report Management', 'Admin: Invite New Member'] 
             
             all_pages = user_pages 
             if st.session_state['is_admin']:
+                all_pages.extend(['Review Reports']) # Add back for admins only
                 all_pages.extend(admin_pages)
 
             # Determine default index for st.radio
@@ -1326,55 +1471,59 @@ def main():
             if st.button("Logout", key="logout_button"):
                 logout_user()
         else:
-            # Login Type Selection
-            st.subheader("Choose Login Type")
-            col_admin_login, col_user_login = st.columns(2)
+            # Main content area when not logged in (login/landing page)
+            # Centralize the main application title
+            col1, col2, col3 = st.columns([1, 4, 1]) # Use columns for centering
 
-            with col_admin_login:
-                if st.button("Login as Admin", key="button_login_admin"):
-                    st.session_state['login_mode'] = 'admin'
-                    st.session_state['current_page'] = 'Login' 
-                    print("DEBUG (main): Admin login mode selected.") # Added terminal print
-                    st.rerun()
-            with col_user_login:
-                if st.button("Login as User", key="button_login_user"):
-                    st.session_state['login_mode'] = 'user'
-                    st.session_state['current_page'] = 'Login' 
-                    print("DEBUG (main): User login mode selected.") # Added terminal print
-                    st.rerun()
-            
-            # Only show login form if a mode has been selected
-            if st.session_state['login_mode']:
-                st.markdown("---")
-                # Show login form based on current page
-                if st.session_state['current_page'] == 'Login':
-                    st.title(f"🔑 Login as {'Administrator' if st.session_state['login_mode'] == 'admin' else 'User'}")
-                    with st.form("login_form"):
-                        email = st.text_input("Email")
-                        password = st.text_input("Password", type="password")
-                        submit_button = st.form_submit_button("Login")
-                        if submit_button:
-                            print(f"DEBUG (main): Login form submitted for {email}.") # Added terminal print
-                            if email and password:
-                                # Pass login_as_admin_attempt based on login_mode
-                                login_user(email, password, login_as_admin_attempt=(st.session_state['login_mode'] == 'admin'))
-                            else:
-                                st.warning("Please enter both email and password.")
-                # The 'Signup' page and its button are now completely removed.
-            else: # If no login mode selected, prompt user
-                st.info("Please select 'Login as Admin' or 'Login as User' to proceed.")
+            with col2: # Content in the middle column
+                st.markdown("<h1 class='main-app-title'>SSO Consultants AI Recruitment System</h1>", unsafe_allow_html=True)
+                st.markdown("<p class='sub-app-title'>Streamlined Talent Acquisition with AI-Powered Insights</p>", unsafe_allow_html=True)
+                
+                st.subheader("Choose Login Type")
+                col_admin_login, col_user_login = st.columns(2) # Buttons in a sub-column layout
 
-    # --- Main Content Area Rendering ---
-    # This block controls what is displayed based on st.session_state['current_page']
+                with col_admin_login:
+                    if st.button("Login as Admin", key="button_login_admin"):
+                        st.session_state['login_mode'] = 'admin'
+                        st.session_state['current_page'] = 'Login' 
+                        print("DEBUG (main): Admin login mode selected.") # Added terminal print
+                        st.rerun()
+                with col_user_login:
+                    if st.button("Login as User", key="button_login_user"):
+                        st.session_state['login_mode'] = 'user'
+                        st.session_state['current_page'] = 'Login' 
+                        print("DEBUG (main): User login mode selected.") # Added terminal print
+                        st.rerun()
+                
+                # Only show login form if a mode has been selected
+                if st.session_state['login_mode']:
+                    st.markdown("---")
+                    # Show login form based on current page
+                    if st.session_state['current_page'] == 'Login':
+                        st.markdown(f"<h3 style='text-align: center; color: #333333;'>🔑 Login as {'Administrator' if st.session_state['login_mode'] == 'admin' else 'User'}</h3>", unsafe_allow_html=True)
+                        with st.form("login_form"):
+                            email = st.text_input("Email")
+                            password = st.text_input("Password", type="password")
+                            submit_button = st.form_submit_button("Login")
+                            if submit_button:
+                                print(f"DEBUG (main): Login form submitted for {email}.") # Added terminal print
+                                if email and password:
+                                    # Pass login_as_admin_attempt based on login_mode
+                                    login_user(email, password, login_as_admin_attempt=(st.session_state['login_mode'] == 'admin'))
+                                else:
+                                    st.warning("Please enter both email and password.")
+                else: # If no login mode selected, prompt user
+                    st.info("Please select 'Login as Admin' or 'Login as User' to proceed.")
 
-    print(f"DEBUG (main rendering): Current page to render: {st.session_state['current_page']}") # Added terminal print
+    # --- Main Content Area Rendering (after login or for password update) ---
+    print(f"DEBUG (main rendering): Current page to render: {st.session_state['current_page']}")
 
     if st.session_state['logged_in']:
         if st.session_state['current_page'] == 'Dashboard':
             dashboard_page()
         elif st.session_state['current_page'] == 'Upload JD & CV':
             upload_jd_cv_page()
-        elif st.session_state['current_page'] == 'Review Reports':
+        elif st.session_state['is_admin'] and st.session_state['current_page'] == 'Review Reports': # Only accessible by admin
             review_reports_page()
         # Admin Pages - ENSURE THESE ARE CHECKED WITH is_admin
         elif st.session_state['is_admin'] and st.session_state['current_page'] == 'Admin Dashboard':
@@ -1385,22 +1534,19 @@ def main():
             admin_report_management_page()
         elif st.session_state['is_admin'] and st.session_state['current_page'] == 'Admin: Invite New Member': 
             admin_invite_member_page()
-        # This case is less likely now as firstLoginRequired handles it, but keeps logic explicit
-        elif st.session_state['current_page'] == 'Update Password': 
+        elif st.session_state['current_page'] == 'Update Password': # This page can be reached directly after temp login
              update_password_page()
         else:
             st.error("Access Denied or Page Not Found. Please navigate using the sidebar.")
-            print(f"ERROR (main rendering): Invalid page state for logged-in user: {st.session_state['current_page']}") # Added terminal print
+            print(f"ERROR (main rendering): Invalid page state for logged-in user: {st.session_state['current_page']}")
     elif st.session_state['current_page'] == 'Update Password': # Allow direct access if flagged for reset, even if not 'fully' logged_in yet
         update_password_page()
-    else:
-        # This part handles the initial login forms, managed by the sidebar's conditional logic
-        print("DEBUG (main rendering): Not logged in. Displaying login/mode selection.") # Added terminal print
-        pass # The login/mode selection is handled directly in the sidebar block
+    # No 'else' block for login/mode selection here, as it's handled by the sidebar's
+    # conditional logic which renders the central content directly when not logged in.
 
     # --- FOOTER (Always visible at the bottom of the page) ---
     st.markdown(
-        '<div style="text-align:center; color:#FF671F; margin-top:30px; padding:10px;">©copyright SSO Consultants</div>',
+        '<div style="text-align:center; color:#666666; margin-top:30px; padding:10px;">©copyright SSO Consultants</div>',
         unsafe_allow_html=True
     )
 
