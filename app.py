@@ -58,13 +58,18 @@ st.markdown(
         color: #000000 !important; /* Force black text for main content areas */
     }
 
-    /* Specific targeting for ALL text elements within the main Streamlit content area */
+    /* Specific targeting for ALL general text elements within the main Streamlit content area */
     /* This overrides any default Streamlit grey text */
+    /* Targeting p, label, Streamlit-generated markdown/text spans */
+    body p, body label, 
     .css-1d3f8gv p, .css-1d3f8gv label, 
-    .css-1d3f8gv .stMarkdown, .css-1d3f8gv .stText,
-    .css-1d3f8gv .stTextInput label, .css-1d3f8gv .stFileUploader label,
-    .css-1d3f8gv .stSelectbox label, .css-1d3f8gv .stRadio label,
-    .css-1d3f8gv .stInfo, .css-1d3f8gv .stWarning, .css-1d3f8gv .stError, .css-1d3f8gv .stSuccess {
+    .logged-in-main-content p, .logged-in-main-content label,
+    .stMarkdown span, .stText span, /* Targeting spans inside st.markdown/st.text where content actually resides */
+    .stTextInput input[type="text"], .stTextInput input[type="password"], /* Input field text */
+    .stTextInput label, .stFileUploader label,
+    .stSelectbox label, .stRadio label,
+    .stCheckbox label, .stDateInput label, .stNumberInput label, .stTextArea label,
+    .stProgress, .stDataFrame {
         color: #000000 !important; /* Force all general text, labels, and alert text to pure black */
     }
 
@@ -116,13 +121,18 @@ st.markdown(
         width: 100%; /* Ensure form takes full width of its column */
         max-width: 500px; /* Limit form width for better appearance on large screens */
     }
-    /* Labels and input fields within the form */
-    .stForm .stTextInput > label, .stForm .stSelectbox > label, .stForm .stRadio > label {
+    /* Labels within the form - explicitly pure black */
+    .stForm .stTextInput > label, 
+    .stForm .stSelectbox > label, 
+    .stForm .stRadio > label,
+    .stForm .stCheckbox > label {
         font-weight: bold;
         color: #000000 !important; /* Pure black for labels on white form background - CRITICAL */
         margin-bottom: 0.5rem;
     }
-    .stForm .stTextInput input[type="text"], .stForm .stTextInput input[type="password"] {
+    /* Input fields (text typed by user) - explicitly pure black */
+    .stForm .stTextInput input[type="text"], 
+    .stForm .stTextInput input[type="password"] {
         color: #000000 !important; /* Pure black text for input fields - CRITICAL */
         background-color: #F8F8F8; /* Very light gray for input background */
         border-radius: 0.5rem;
@@ -135,10 +145,31 @@ st.markdown(
         border-color: #1976D2; /* Focus color matching logo blue */
         box-shadow: 0 0 0 0.2rem rgba(25, 118, 210, 0.25); 
     }
-    /* General labels outside forms, e.g., the JD/CV upload labels (covered by .css-1d3f8gv label now) */
+    
+    /* Styling for Radio Buttons (User/Admin under Assign Role) */
+    /* Target the text itself inside the radio options */
+    .stRadio div[data-testid="stRadio"] label span p {
+        color: #000000 !important; /* Pure black for 'User' and 'Admin' text - CRITICAL */
+    }
+    /* Style the radio button circles (unselected) */
+    .stRadio div[data-testid="stRadio"] input[type="radio"] + div::before {
+        background-color: #FFFFFF !important; /* White background for unselected */
+        border: 2px solid #333333 !important; /* Dark border for unselected */
+        width: 18px !important; /* Consistent size */
+        height: 18px !important; /* Consistent size */
+        top: 3px !important; /* Adjust vertical alignment */
+        left: 0px !important; /* Adjust horizontal alignment */
+    }
+    /* Style the radio button circles (selected dot) */
+    .stRadio div[data-testid="stRadio"] input[type="radio"]:checked + div::after {
+        background-color: #1976D2 !important; /* Vibrant Blue for selected dot - CRITICAL */
+        width: 10px !important; /* Size of the inner dot */
+        height: 10px !important; /* Size of the inner dot */
+        top: 7px !important; /* Adjust vertical alignment of dot */
+        left: 4px !important; /* Adjust horizontal alignment of dot */
+    }
 
-
-    /* Success/Error/Warning messages */
+    /* Success/Error/Warning/Info messages */
     .stAlert {
         border-radius: 0.5rem;
         margin-top: 1rem;
@@ -160,11 +191,10 @@ st.markdown(
         border-color: #ffeeba;
     }
     .stAlert.info { /* Explicitly targeting info alerts */
-        background-color: #d1ecf1; /* Light blue */
+        background-color: #d1ecf1; /* Light blue info box background */
         color: #000000 !important; /* Pure black text - CRITICAL */
         border-color: #bee5eb;
     }
-
 
     /* Specific style for the initial info message on login page */
     .initial-info-message {
@@ -205,7 +235,8 @@ st.markdown(
         color: #0D47A1 !important; /* Deep Dark Blue for all headings - CRITICAL */
     }
     /* Override for the login form h3 to be pure black as requested */
-    .st-emotion-cache-nahz7x, .st-emotion-cache-nahz7x + h3 { 
+    /* Target the specific generated Streamlit h3 elements for the login prompt */
+    .st-emotion-cache-nahz7x h3, .st-emotion-cache-nahz7x { 
         color: #000000 !important; /* Pure black for the login mode title - CRITICAL */
     }
 
@@ -237,6 +268,8 @@ st.markdown(
     }
     /* Force all text elements within the main content area (after login) to be pure black */
     .logged-in-main-content p, 
+    .logged-in-main-content .stMarkdown, /* Ensure text inside markdown is black */
+    .logged-in-main-content .stText, /* Ensure text inside st.text is black */
     .logged-in-main-content .stInfo, 
     .logged-in-main-content .stWarning,
     .logged-in-main-content .stError,
@@ -1050,7 +1083,7 @@ def admin_user_management_page():
 
     users_data = []
     try:
-        print("DEBUG (admin_user_management_page): Fetching all users from Firestore.") 
+        print(f"DEBUG (admin_user_management_page): Fetching all users from Firestore.") 
         users_ref = db.collection('users') 
         docs = users_ref.stream()
 
