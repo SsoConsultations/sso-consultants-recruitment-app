@@ -37,10 +37,10 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* General body styling for light theme */
+    /* Global base styling - pure white background, pure black text by default */
     body {
         background-color: #FFFFFF; /* Pure white background */
-        color: #000000 !important; /* Pure black for general text readability - IMPORTANT */
+        color: #000000 !important; /* Pure black for general text readability - CRITICAL */
         font-family: 'Inter', sans-serif;
     }
 
@@ -52,30 +52,33 @@ st.markdown(
         display: none; /* We will render our own custom footer */
     }
 
-    /* Main content container background - ensuring it's white */
-    .stApp {
-        background-color: #FFFFFF;
+    /* Main Streamlit app container and content blocks */
+    .stApp, .css-18e3th9, .css-1d3f8gv {
+        background-color: #FFFFFF; /* Ensure all main content areas are white */
+        color: #000000 !important; /* Force black text for main content areas */
     }
 
-    /* Target specific Streamlit classes for main content block */
-    .css-18e3th9 { /* Main content container */
-        background-color: #FFFFFF; /* Match main content background */
-        padding-top: 0rem; 
-        padding-bottom: 0rem;
-    }
-    .css-1d3f8gv { /* This class holds the main block for the app */
-        background-color: #FFFFFF; /* Match main content background */
+    /* Specific targeting for ALL text elements within the main Streamlit content area */
+    /* This overrides any default Streamlit grey text */
+    .css-1d3f8gv p, .css-1d3f8gv label, 
+    .css-1d3f8gv .stMarkdown, .css-1d3f8gv .stText,
+    .css-1d3f8gv .stTextInput label, .css-1d3f8gv .stFileUploader label,
+    .css-1d3f8gv .stSelectbox label, .css-1d3f8gv .stRadio label,
+    .css-1d3f8gv .stInfo, .css-1d3f8gv .stWarning, .css-1d3f8gv .stError, .css-1d3f8gv .stSuccess {
+        color: #000000 !important; /* Force all general text, labels, and alert text to pure black */
     }
 
     /* Customizing the sidebar - It will only appear when logged in */
     .css-1lcbmhc { /* Sidebar container */
         background-color: #212529; /* Dark sidebar background for strong contrast */
-        color: white;
+        color: white; /* Default text in sidebar */
         padding-top: 2rem;
         padding-bottom: 2rem;
     }
-    .css-1lcbmhc .stRadio > label {
-        color: white !important; /* Radio button labels in sidebar - IMPORTANT for visibility */
+    .css-1lcbmhc .stRadio > label, /* Sidebar specific radio labels */
+    .css-1lcbmhc h1, .css-1lcbmhc h2, .css-1lcbmhc h3, .css-1lcbmhc h4, .css-1lcbmhc h5, .css-1lcbmhc h6, /* Sidebar headings */
+    .css-1lcbmhc p { /* Sidebar paragraphs */
+        color: white !important; /* Force all sidebar text to white/light grey */
     }
     .css-1lcbmhc .stButton > button {
         background-color: #0D47A1; /* Deep blue from logo for sidebar buttons */
@@ -83,12 +86,6 @@ st.markdown(
         border-radius: 0.5rem;
         border: none;
         padding: 0.5rem 1rem;
-    }
-    .css-1lcbmhc h1, .css-1lcbmhc h2, .css-1lcbmhc h3, .css-1lcbmhc h4, .css-1lcbmhc h5, .css-1lcbmhc h6 {
-        color: white !important; /* Sidebar headings - IMPORTANT for visibility */
-    }
-    .css-1lcbmhc p {
-        color: #cccccc !important; /* Sidebar paragraphs - IMPORTANT for visibility */
     }
 
     /* Styling for the main login buttons (Login as Admin, Login as User) */
@@ -122,11 +119,11 @@ st.markdown(
     /* Labels and input fields within the form */
     .stForm .stTextInput > label, .stForm .stSelectbox > label, .stForm .stRadio > label {
         font-weight: bold;
-        color: #000000 !important; /* Pure black for labels on white form background - IMPORTANT for visibility */
+        color: #000000 !important; /* Pure black for labels on white form background - CRITICAL */
         margin-bottom: 0.5rem;
     }
     .stForm .stTextInput input[type="text"], .stForm .stTextInput input[type="password"] {
-        color: #000000 !important; /* Pure black text for input fields - IMPORTANT for visibility */
+        color: #000000 !important; /* Pure black text for input fields - CRITICAL */
         background-color: #F8F8F8; /* Very light gray for input background */
         border-radius: 0.5rem;
         border: 1px solid #ced4da;
@@ -138,10 +135,8 @@ st.markdown(
         border-color: #1976D2; /* Focus color matching logo blue */
         box-shadow: 0 0 0 0.2rem rgba(25, 118, 210, 0.25); 
     }
-    /* General labels outside forms, e.g., the JD/CV upload labels */
-    label {
-        color: #000000 !important; /* Pure black for general labels - IMPORTANT for visibility */
-    }
+    /* General labels outside forms, e.g., the JD/CV upload labels (covered by .css-1d3f8gv label now) */
+
 
     /* Success/Error/Warning messages */
     .stAlert {
@@ -151,29 +146,30 @@ st.markdown(
     }
     .stAlert.success {
         background-color: #d4edda; /* Light green */
-        color: #155724 !important; /* Dark green text - IMPORTANT for visibility */
+        color: #155724 !important; /* Dark green text - CRITICAL */
         border-color: #c3e6cb;
     }
     .stAlert.error {
         background-color: #f8d7da; /* Light red */
-        color: #721c24 !important; /* Dark red text - IMPORTANT for visibility */
+        color: #721c24 !important; /* Dark red text - CRITICAL */
         border-color: #f5c6cb;
     }
     .stAlert.warning {
         background-color: #fff3cd; /* Light yellow */
-        color: #856404 !important; /* Dark yellow text - IMPORTANT for visibility */
+        color: #856404 !important; /* Dark yellow text - CRITICAL */
         border-color: #ffeeba;
     }
-    .stAlert.info { /* Added explicit info color */
+    .stAlert.info { /* Explicitly targeting info alerts */
         background-color: #d1ecf1; /* Light blue */
-        color: #000000 !important; /* Pure black text - IMPORTANT for visibility */
+        color: #000000 !important; /* Pure black text - CRITICAL */
         border-color: #bee5eb;
     }
+
 
     /* Specific style for the initial info message on login page */
     .initial-info-message {
         font-size: 1.1em;
-        color: #000000 !important; /* Pure black for clear visibility - IMPORTANT */
+        color: #000000 !important; /* Pure black for clear visibility - CRITICAL */
         margin-top: 1.5rem; 
         margin-bottom: 2rem;
         font-style: italic;
@@ -191,26 +187,26 @@ st.markdown(
 
     /* Styling for the central main title */
     .main-app-title {
-        color: #0D47A1 !important; /* Deep Dark Blue for main title - IMPORTANT for visibility */
+        color: #0D47A1 !important; /* Deep Dark Blue for main title - CRITICAL */
         font-size: 2.8em; 
         font-weight: bold;
         margin-bottom: 0.5rem; 
         text-align: center; /* Explicitly center align */
     }
     .sub-app-title {
-        color: #0D47A1 !important; /* Deep Dark Blue for subtitle - IMPORTANT for visibility */
+        color: #0D47A1 !important; /* Deep Dark Blue for subtitle - CRITICAL */
         font-size: 1.3em; 
         margin-bottom: 2.5rem; 
         text-align: center; /* Explicitly center align */
     }
-    /* Specific styling for the H3 "Login as Administrator/User" title */
-    /* Target h3 elements that might be Streamlit's generated headers */
-    h3 {
-        color: #000000 !important; /* Pure black for general h3 tags - IMPORTANT for visibility */
+
+    /* Specific targeting for all h1, h2, h3, h4, h5, h6 tags */
+    h1, h2, h3, h4, h5, h6 {
+        color: #0D47A1 !important; /* Deep Dark Blue for all headings - CRITICAL */
     }
-    /* Even more specific targeting for the login form h3 */
+    /* Override for the login form h3 to be pure black as requested */
     .st-emotion-cache-nahz7x, .st-emotion-cache-nahz7x + h3 { 
-        color: #000000 !important; /* Pure black for the login mode title - IMPORTANT for visibility */
+        color: #000000 !important; /* Pure black for the login mode title - CRITICAL */
     }
 
 
@@ -239,15 +235,22 @@ st.markdown(
         margin-right: 1rem; 
         width: calc(100% - 2rem); 
     }
-    /* Ensure general text within logged-in content is pure black */
+    /* Force all text elements within the main content area (after login) to be pure black */
     .logged-in-main-content p, 
     .logged-in-main-content .stInfo, 
     .logged-in-main-content .stWarning,
     .logged-in-main-content .stError,
     .logged-in-main-content label,
     .logged-in-main-content .stSelectbox,
-    .logged-in-main-content .stRadio { /* Added selectbox and radio too */
-        color: #000000 !important; /* Pure black for all general text and labels - IMPORTANT for visibility */
+    .logged-in-main-content .stRadio,
+    .logged-in-main-content .stCheckbox,
+    .logged-in-main-content .stDateInput,
+    .logged-in-main-content .stNumberInput,
+    .logged-in-main-content .stTextArea,
+    .logged-in-main-content .stProgress,
+    .logged-in-main-content .stDataFrame /* Adding more general text elements */
+     {
+        color: #000000 !important; /* Pure black for all general text and labels - CRITICAL */
     }
     /* Ensure headings on logged-in pages are deep dark blue */
     .logged-in-main-content h1, 
@@ -257,7 +260,7 @@ st.markdown(
     .logged-in-main-content h5,
     .logged-in-main-content h6 {
         text-align: left; 
-        color: #0D47A1 !important; /* Deep Dark Blue for headings when logged in - IMPORTANT for visibility */
+        color: #0D47A1 !important; /* Deep Dark Blue for headings when logged in - CRITICAL */
     }
     .logged-in-main-content .stForm {
         width: auto; 
@@ -1171,7 +1174,7 @@ def admin_report_management_page():
 
     all_reports_data = []
     try:
-        print("DEBUG (admin_report_management_page): Fetching all reports from Firestore.") 
+        print(f"DEBUG (admin_report_management_page): Fetching all reports from Firestore.") 
         reports_ref = db.collection('jd_cv_reports').order_by('review_date', direction=firestore.Query.DESCENDING) 
         docs = reports_ref.stream()
 
@@ -1471,6 +1474,7 @@ def main():
                 logout_user()
         
         # Add a div to the main content area for logged-in users to override centering if needed
+        # This div should contain all the problematic grey text
         st.markdown('<div class="logged-in-main-content">', unsafe_allow_html=True)
         
         # --- Render Logged-in Pages ---
