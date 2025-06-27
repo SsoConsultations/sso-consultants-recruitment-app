@@ -247,13 +247,13 @@ st.markdown(
     }
 
 
-    /* Top-right logo container - NO CHANGES PER USER INSTRUCTION */
+    /* Top-right logo container */
     .top-right-logo {
         position: fixed; 
         top: 10px; 
         right: 10px; 
         z-index: 9999; 
-        background-color: rgba(255, 255, 255, 0.0); 
+        background-color: rgba(255, 255, 255, 0.0); /* Transparent background */
         padding: 5px;
         border-radius: 8px;
         border: 2px solid red; /* *** DEBUGGING BORDER - RETAINED AS REQUESTED *** */
@@ -323,21 +323,20 @@ st.markdown(
 )
 
 # --- Inject Top-Right Logo HTML ---
-# IMPORTANT: src path is 'app/static/logo.png'. Red border kept for debugging.
+# IMPORTANT: Updated src path to reflect logo.png in the root of the repository
 st.markdown(
     f"""
     <div class="top-right-logo">
-        <img src="app/static/logo.png" alt="Company Logo" onerror="this.onerror=null; this.src='https://placehold.co/100x100/A0A0A0/FFFFFF?text=Logo+Missing';">
+        <img src="logo.png" alt="Company Logo" onerror="this.onerror=null; this.src='https://placehold.co/100x100/A0A0A0/FFFFFF?text=Logo+Missing';">
     </div>
     """,
     unsafe_allow_html=True
 )
 
 # --- Configuration: NOW READING FROM STREAMLIT SECRETS ---
-# >>>>>>>>>>>>>>>>>>>>>>>>>> IMPORTANT: THIS MUST BE YOUR ACTUAL FIREBASE STORAGE BUCKET NAME <<<<<<<<<<<<<<<<<<<<<<<<<<<<
-# You can find this in your Firebase Console under "Storage" -> "Files" tab, look for "Your bucket" name.
-# It is CONFIRMED to be 'ecr-app-drive-integration.appspot.com' from your screenshot.
-FIREBASE_STORAGE_BUCKET_NAME = 'ecr-app-drive-integration.appspot.com' # CONFIRMED FROM YOUR SCREENSHOT
+# This is confirmed from your screenshot (image_d8fe43.png) to be the correct bucket name.
+# The issue is likely with IAM permissions for the service account, not the bucket name itself.
+FIREBASE_STORAGE_BUCKET_NAME = 'ecr-app-drive-integration.appspot.com' 
 
 # --- Firebase Initialization Function ---
 def initialize_firebase_app():
@@ -1008,7 +1007,7 @@ def save_report_on_download(filename, docx_buffer, ai_result, jd_original_name, 
             if download_url:
                 try:
                     blob.delete()
-                    print(f"DEBUG: Deleted file from Storage due to generic Firestore save failure. Error during delete: {e_del}") # Added e_del to log
+                    print(f"DEBUG: Deleted file from Storage due to generic Firestore save failure. Error during delete: {e_del}") 
                 except Exception as e_del:
                     print(f"ERROR: Failed to delete Storage file after generic error: {e_del}")
 
@@ -1453,7 +1452,7 @@ def update_password_page():
     with st.form("update_password_form"):
         current_temp_password = st.text_input("Current Temporary Password", type="password", help="The password you just used to log in.", key="current_temp_password")
         new_password = st.text_input("New Password", type="password", help="Your new permanent password.", key="new_password")
-        confirm_new_password = st.text_input("Confirm New Password", type="password", help="Re-enter your new password to confirm.", key="confirm_new_password")
+        confirm_new_password = st.text_input("Confirm New Password", type="password", help="Re-enter your new password to confirm.", key="new_password")
         
         submit_update_button = st.form_submit_button("Update Password")
 
