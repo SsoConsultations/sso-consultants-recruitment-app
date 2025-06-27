@@ -40,7 +40,7 @@ st.markdown(
     /* General body styling for light theme */
     body {
         background-color: #FFFFFF; /* Pure white background */
-        color: #222222; /* Very dark charcoal for general text readability */
+        color: #000000; /* Pure black for general text readability */
         font-family: 'Inter', sans-serif;
     }
 
@@ -75,7 +75,7 @@ st.markdown(
         padding-bottom: 2rem;
     }
     .css-1lcbmhc .stRadio > label {
-        color: white; /* Radio button labels in sidebar */
+        color: white !important; /* Radio button labels in sidebar - important for visibility */
     }
     .css-1lcbmhc .stButton > button {
         background-color: #0D47A1; /* Deep blue from logo for sidebar buttons */
@@ -85,10 +85,10 @@ st.markdown(
         padding: 0.5rem 1rem;
     }
     .css-1lcbmhc h1, .css-1lcbmhc h2, .css-1lcbmhc h3, .css-1lcbmhc h4, .css-1lcbmhc h5, .css-1lcbmhc h6 {
-        color: white; /* Sidebar headings */
+        color: white !important; /* Sidebar headings - important for visibility */
     }
     .css-1lcbmhc p {
-        color: #cccccc; /* Sidebar paragraphs */
+        color: #cccccc !important; /* Sidebar paragraphs - important for visibility */
     }
 
     /* Styling for the main login buttons (Login as Admin, Login as User) */
@@ -122,11 +122,11 @@ st.markdown(
     /* Labels and input fields within the form */
     .stForm .stTextInput > label, .stForm .stSelectbox > label, .stForm .stRadio > label {
         font-weight: bold;
-        color: #333333; /* Dark text for labels on white form background */
+        color: #000000 !important; /* Pure black for labels on white form background - important for visibility */
         margin-bottom: 0.5rem;
     }
     .stForm .stTextInput input[type="text"], .stForm .stTextInput input[type="password"] {
-        color: #333333; /* Dark text for input fields */
+        color: #000000 !important; /* Pure black text for input fields - important for visibility */
         background-color: #F8F8F8; /* Very light gray for input background */
         border-radius: 0.5rem;
         border: 1px solid #ced4da;
@@ -140,7 +140,7 @@ st.markdown(
     }
     /* General labels outside forms, e.g., the JD/CV upload labels */
     label {
-        color: #222222; /* Very dark charcoal for general labels */
+        color: #000000 !important; /* Pure black for general labels - important for visibility */
     }
 
     /* Success/Error/Warning messages */
@@ -151,23 +151,23 @@ st.markdown(
     }
     .stAlert.success {
         background-color: #d4edda; /* Light green */
-        color: #155724; /* Dark green text */
+        color: #155724 !important; /* Dark green text - important for visibility */
         border-color: #c3e6cb;
     }
     .stAlert.error {
         background-color: #f8d7da; /* Light red */
-        color: #721c24; /* Dark red text */
+        color: #721c24 !important; /* Dark red text - important for visibility */
         border-color: #f5c6cb;
     }
     .stAlert.warning {
         background-color: #fff3cd; /* Light yellow */
-        color: #856404; /* Dark yellow text */
+        color: #856404 !important; /* Dark yellow text - important for visibility */
         border-color: #ffeeba;
     }
     /* Specific style for the initial info message on login page */
     .initial-info-message {
         font-size: 1.1em;
-        color: #222222; /* Very dark charcoal for clear visibility */
+        color: #000000 !important; /* Pure black for clear visibility - important */
         margin-top: 1.5rem; 
         margin-bottom: 2rem;
         font-style: italic;
@@ -185,25 +185,25 @@ st.markdown(
 
     /* Styling for the central main title */
     .main-app-title {
-        color: #0D47A1 !important; /* Deep Dark Blue for main title */
+        color: #0D47A1 !important; /* Deep Dark Blue for main title - important for visibility */
         font-size: 2.8em; 
         font-weight: bold;
         margin-bottom: 0.5rem; 
         text-align: center; /* Explicitly center align */
     }
     .sub-app-title {
-        color: #0D47A1 !important; /* Deep Dark Blue for subtitle */
+        color: #0D47A1 !important; /* Deep Dark Blue for subtitle - important for visibility */
         font-size: 1.3em; 
         margin-bottom: 2.5rem; 
         text-align: center; /* Explicitly center align */
     }
     /* Specific styling for the H3 "Login as Administrator/User" title */
     .st-emotion-cache-nahz7x { /* Target Streamlit's h3 class */
-        color: #333333 !important; /* Dark charcoal for the login mode title */
+        color: #000000 !important; /* Pure black for the login mode title - important for visibility */
     }
     /* Fallback if the above is not specific enough for h3 inside login form */
     .st-emotion-cache-nahz7x + h3 { 
-        color: #333333 !important;
+        color: #000000 !important;
     }
 
 
@@ -232,13 +232,19 @@ st.markdown(
         margin-right: 1rem; 
         width: calc(100% - 2rem); 
     }
-    /* Ensure general text within logged-in content is dark charcoal */
-    .logged-in-main-content p, .logged-in-main-content .stInfo, .logged-in-main-content label {
-        color: #222222 !important; 
+    /* Ensure general text within logged-in content is pure black */
+    .logged-in-main-content p, 
+    .logged-in-main-content .stInfo, 
+    .logged-in-main-content .stWarning,
+    .logged-in-main-content .stError,
+    .logged-in-main-content label {
+        color: #000000 !important; /* Pure black for all general text and labels - important for visibility */
     }
-    .logged-in-main-content h1, .logged-in-main-content h2, .logged-in-main-content h3 {
+    .logged-in-main-content h1, 
+    .logged-in-main-content h2, 
+    .logged-in-main-content h3 {
         text-align: left; 
-        color: #0D47A1 !important; /* Deep Dark Blue for headings when logged in */
+        color: #0D47A1 !important; /* Deep Dark Blue for headings when logged in - important for visibility */
     }
     .logged-in-main-content .stForm {
         width: auto; 
@@ -1509,7 +1515,7 @@ def main():
             col_form_left, col_form_center, col_form_right = st.columns([1, 2, 1])
             with col_form_center: # Form in the middle column
                 # The h3 for login form title
-                st.markdown(f"<h3 style='text-align: center; color: #333333;'>🔑 Login as {'Administrator' if st.session_state['login_mode'] == 'admin' else 'User'}</h3>", unsafe_allow_html=True) 
+                st.markdown(f"<h3 style='text-align: center; color: #000000 !important;'>🔑 Login as {'Administrator' if st.session_state['login_mode'] == 'admin' else 'User'}</h3>", unsafe_allow_html=True) 
                 with st.form("login_form"):
                     email = st.text_input("Email")
                     password = st.text_input("Password", type="password")
