@@ -338,7 +338,7 @@ st.markdown(
 # >>>>>>>>>>>>>>>>>>>>>>>>>> IMPORTANT: REPLACE THIS WITH YOUR NEW FIREBASE STORAGE BUCKET NAME <<<<<<<<<<<<<<<<<<<<<<<<<<<<
 # Example: 'your-new-project-id.appspot.com' or 'your-new-bucket-name.appspot.com'
 # You will get this from the Firebase Console -> Storage after creating a new bucket.
-FIREBASE_STORAGE_BUCKET_NAME = 'my-recruitment-docs.appspot.com' 
+FIREBASE_STORAGE_BUCKET_NAME = 'sso-recruitment-data.appspot.com' # <--- UPDATED TO THE NEW BUCKET!
 
 
 # --- Firebase Initialization Function ---
@@ -890,11 +890,15 @@ def upload_jd_cv_page():
                 ", ".join(st.session_state['cv_filenames_for_save'])
             )
             
-            # --- START OF CHATGPT SUGGESTED CHANGE ---
-            # ✅ SAVE to cloud first, as soon as DOCX is generated
+            # --- START OF CHATGPT SUGGESTED CHANGE: SAVE TO CLOUD BEFORE DISPLAYING DOWNLOAD BUTTON ---
+            # Generate filename for saving
             timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
             download_filename = f"{st.session_state['user_name'].replace(' ', '')}_JD-CV_Comparison_Analysis_{timestamp_str}.docx"
 
+            # Adding extra debug prints
+            print("DEBUG (upload_jd_cv_page): Calling save_report_on_download now...")
+            
+            # ✅ CALL save_report_on_download DIRECTLY here
             save_report_on_download(
                 download_filename,
                 st.session_state['generated_docx_buffer'],
@@ -902,6 +906,7 @@ def upload_jd_cv_page():
                 st.session_state['jd_filename_for_save'],
                 st.session_state['cv_filenames_for_save']
             )
+            print("DEBUG (upload_jd_cv_page): save_report_on_download call completed.")
             # --- END OF CHATGPT SUGGESTED CHANGE ---
 
             st.session_state['review_triggered'] = True 
@@ -944,17 +949,15 @@ def upload_jd_cv_page():
 
         st.subheader("Download & Save Report")
         
-        # --- START OF CHATGPT SUGGESTED CHANGE (Modified download button) ---
-        timestamp_str_for_download = datetime.now().strftime('%Y%m%d_%H%M%S') # Re-generate for download button as save happens earlier
-        download_filename_for_button = f"{st.session_state['user_name'].replace(' ', '')}_JD-CV_Comparison_Analysis_{timestamp_str_for_download}.docx"
-
+        # --- START OF CHATGPT SUGGESTED CHANGE (Modified download button structure) ---
+        # No more on_click for save_report_on_download here as it's called earlier
         if st.session_state['generated_docx_buffer']:
             st.download_button(
-                label="Download DOCX Report ⬇️", # Label changed
+                label="Download DOCX Report ⬇️", # Label changed for clarity
                 data=st.session_state['generated_docx_buffer'],
-                file_name=download_filename_for_button, # Use a unique filename for the download to avoid conflicts if saved multiple times
+                file_name=download_filename, # Use the same filename generated for saving
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
-                key="download_docx" # Key changed
+                key="download_docx_only" # New key for this button
             )
         else:
             st.warning("Run an AI review to generate a report for download and save.")
@@ -1003,6 +1006,8 @@ def save_report_on_download(filename, docx_buffer, ai_result, jd_original_name, 
         print(f"DEBUG (save_report_on_download): Prepared Firestore metadata: {report_metadata}") 
 
         try:
+            # Adding debug print before Firestore save
+            print("DEBUG (save_report_on_download): About to attempt saving metadata to Firestore...")
             db.collection('jd_cv_reports').add(report_metadata) 
             st.success("Report metadata saved to Firestore successfully!") 
             print("DEBUG (save_report_on_download): Report metadata successfully added to Firestore.") 
@@ -1326,7 +1331,7 @@ def admin_report_management_page():
             index_link_match = re.search(r'https://console\.firebase\.google\.com/v1/r/project/[^"]+', error_message)
             index_link = index_link_match.group(0) if index_link_match else "your Firebase console -> Firestore Database -> Indexes tab."
             st.error(f"""
-            **Error: Database Index Missing for Admin Reports!**
+            **Error: Database Index Missing!**
             To view ALL reports, a specific database index is required by Firebase when ordering.
             
             Please click the link below to create the index in your Firebase console:
