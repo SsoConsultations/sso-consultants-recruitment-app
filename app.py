@@ -931,7 +931,7 @@ def upload_jd_cv_page():
                 label="Download & Save DOCX Report ⬇️☁️", 
                 data=st.session_state['generated_docx_buffer'],
                 file_name=download_filename,
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", # Corrected MIME type
                 key="download_and_save_docx",
                 on_click=lambda: save_report_on_download(
                     download_filename,
@@ -963,7 +963,7 @@ def save_report_on_download(filename, docx_buffer, ai_result, jd_original_name, 
         print(f"DEBUG (save_report_on_download): Attempting to upload file to Storage at: {storage_file_path}") 
         blob = bucket.blob(storage_file_path) 
         docx_buffer.seek(0) 
-        blob.upload_from_string(docx_buffer.getvalue(), content_type="application/vnd.openxmlformats-officedocument.wordprocessingprocessingml.document")
+        blob.upload_from_string(docx_buffer.getvalue(), content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document") # Corrected MIME type
         
         blob.make_public() 
         download_url = blob.public_url
@@ -1063,9 +1063,26 @@ def review_reports_page():
         else:
             st.info("No reports found yet for your account. Start by uploading JD & CVs!")
             print("DEBUG (review_reports_page): No reports found for this user.") 
+    except exceptions.FirebaseError as e: # Catch specific Firebase errors
+        error_message = str(e)
+        if "The query requires an index" in error_message:
+            st.error(f"""
+            **Error: Database Index Missing!**
+            To view reports, a special database index is required. This happens when filtering and sorting data simultaneously.
+            
+            Please click the link below to create the index in your Firebase console:
+            
+            **[Create Firestore Index Here]({error_message.split("You can create it here: ")[1].strip()})**
+            
+            After clicking the link and creating the index, please allow a few minutes for it to activate, then refresh this page.
+            """)
+            print(f"ERROR (review_reports_page): Firebase Indexing Error: {e}") 
+        else:
+            st.error(f"Error fetching your review reports: {e}")
+            print(f"ERROR (review_reports_page): Generic Firebase Error fetching reports: {e}") 
     except Exception as e:
         st.error(f"Error fetching your review reports: {e}")
-        print(f"ERROR (review_reports_page): Error fetching user reports: {e}") 
+        print(f"ERROR (review_reports_page): Unexpected Error fetching reports: {e}") 
 
 
 # --- Admin Pages ---
@@ -1281,9 +1298,24 @@ def admin_report_management_page():
             st.info("No reports found in the database.")
             print("DEBUG (admin_report_management_page): No reports found in database.") 
 
+    except exceptions.FirebaseError as e: # Catch specific Firebase errors
+        error_message = str(e)
+        if "The query requires an index" in error_message:
+            st.error(f"""
+            **Error: Database Index Missing for Admin Reports!**
+            To view ALL reports, a special database index is required. This happens when sorting data without a direct filter.
+            
+            Please check your Firebase console for a link to create the index, or manually create an index on `review_date` (descending) for the `jd_cv_reports` collection.
+            
+            After creating the index, please allow a few minutes for it to activate, then refresh this page.
+            """)
+            print(f"ERROR (admin_report_management_page): Firebase Indexing Error: {e}") 
+        else:
+            st.error(f"Error fetching all reports for admin management: {e}")
+            print(f"ERROR (admin_report_management_page): Generic Firebase Error fetching all reports: {e}") 
     except Exception as e:
         st.error(f"Error fetching all reports for admin management: {e}")
-        print(f"ERROR (admin_report_management_page): Error fetching all reports: {e}") 
+        print(f"ERROR (admin_report_management_page): Unexpected Error fetching all reports: {e}") 
 
 def admin_invite_member_page():
     """Admin page to invite and create new user accounts."""
@@ -1412,7 +1444,7 @@ def update_password_page():
         
         submit_update_button = st.form_submit_button("Update Password")
 
-        if submit_update_button: # This is the corrected and proper place for this logic
+        if submit_update_button: 
             print("DEBUG (update_password_page): 'Update Password' button clicked.") 
             if not (current_temp_password and new_password and confirm_new_password):
                 update_status_placeholder.warning("Please fill in all password fields.")
@@ -1577,7 +1609,7 @@ def main():
                     email = st.text_input("Email")
                     password = st.text_input("Password", type="password")
                     submit_button = st.form_submit_button("Login")
-                    if submit_button: # This is the correct and proper place for this logic
+                    if submit_button: 
                         print(f"DEBUG (main): Login form submitted for {email}.") 
                         if email and password:
                             login_user(email, password, login_as_admin_attempt=(st.session_state['login_mode'] == 'admin'))
