@@ -40,7 +40,7 @@ st.markdown(
     /* General body styling for light theme */
     body {
         background-color: #FFFFFF; /* Pure white background */
-        color: #000000; /* Pure black for general text readability */
+        color: #000000 !important; /* Pure black for general text readability - IMPORTANT */
         font-family: 'Inter', sans-serif;
     }
 
@@ -75,7 +75,7 @@ st.markdown(
         padding-bottom: 2rem;
     }
     .css-1lcbmhc .stRadio > label {
-        color: white !important; /* Radio button labels in sidebar - important for visibility */
+        color: white !important; /* Radio button labels in sidebar - IMPORTANT for visibility */
     }
     .css-1lcbmhc .stButton > button {
         background-color: #0D47A1; /* Deep blue from logo for sidebar buttons */
@@ -85,10 +85,10 @@ st.markdown(
         padding: 0.5rem 1rem;
     }
     .css-1lcbmhc h1, .css-1lcbmhc h2, .css-1lcbmhc h3, .css-1lcbmhc h4, .css-1lcbmhc h5, .css-1lcbmhc h6 {
-        color: white !important; /* Sidebar headings - important for visibility */
+        color: white !important; /* Sidebar headings - IMPORTANT for visibility */
     }
     .css-1lcbmhc p {
-        color: #cccccc !important; /* Sidebar paragraphs - important for visibility */
+        color: #cccccc !important; /* Sidebar paragraphs - IMPORTANT for visibility */
     }
 
     /* Styling for the main login buttons (Login as Admin, Login as User) */
@@ -122,11 +122,11 @@ st.markdown(
     /* Labels and input fields within the form */
     .stForm .stTextInput > label, .stForm .stSelectbox > label, .stForm .stRadio > label {
         font-weight: bold;
-        color: #000000 !important; /* Pure black for labels on white form background - important for visibility */
+        color: #000000 !important; /* Pure black for labels on white form background - IMPORTANT for visibility */
         margin-bottom: 0.5rem;
     }
     .stForm .stTextInput input[type="text"], .stForm .stTextInput input[type="password"] {
-        color: #000000 !important; /* Pure black text for input fields - important for visibility */
+        color: #000000 !important; /* Pure black text for input fields - IMPORTANT for visibility */
         background-color: #F8F8F8; /* Very light gray for input background */
         border-radius: 0.5rem;
         border: 1px solid #ced4da;
@@ -140,7 +140,7 @@ st.markdown(
     }
     /* General labels outside forms, e.g., the JD/CV upload labels */
     label {
-        color: #000000 !important; /* Pure black for general labels - important for visibility */
+        color: #000000 !important; /* Pure black for general labels - IMPORTANT for visibility */
     }
 
     /* Success/Error/Warning messages */
@@ -151,23 +151,29 @@ st.markdown(
     }
     .stAlert.success {
         background-color: #d4edda; /* Light green */
-        color: #155724 !important; /* Dark green text - important for visibility */
+        color: #155724 !important; /* Dark green text - IMPORTANT for visibility */
         border-color: #c3e6cb;
     }
     .stAlert.error {
         background-color: #f8d7da; /* Light red */
-        color: #721c24 !important; /* Dark red text - important for visibility */
+        color: #721c24 !important; /* Dark red text - IMPORTANT for visibility */
         border-color: #f5c6cb;
     }
     .stAlert.warning {
         background-color: #fff3cd; /* Light yellow */
-        color: #856404 !important; /* Dark yellow text - important for visibility */
+        color: #856404 !important; /* Dark yellow text - IMPORTANT for visibility */
         border-color: #ffeeba;
     }
+    .stAlert.info { /* Added explicit info color */
+        background-color: #d1ecf1; /* Light blue */
+        color: #000000 !important; /* Pure black text - IMPORTANT for visibility */
+        border-color: #bee5eb;
+    }
+
     /* Specific style for the initial info message on login page */
     .initial-info-message {
         font-size: 1.1em;
-        color: #000000 !important; /* Pure black for clear visibility - important */
+        color: #000000 !important; /* Pure black for clear visibility - IMPORTANT */
         margin-top: 1.5rem; 
         margin-bottom: 2rem;
         font-style: italic;
@@ -185,25 +191,26 @@ st.markdown(
 
     /* Styling for the central main title */
     .main-app-title {
-        color: #0D47A1 !important; /* Deep Dark Blue for main title - important for visibility */
+        color: #0D47A1 !important; /* Deep Dark Blue for main title - IMPORTANT for visibility */
         font-size: 2.8em; 
         font-weight: bold;
         margin-bottom: 0.5rem; 
         text-align: center; /* Explicitly center align */
     }
     .sub-app-title {
-        color: #0D47A1 !important; /* Deep Dark Blue for subtitle - important for visibility */
+        color: #0D47A1 !important; /* Deep Dark Blue for subtitle - IMPORTANT for visibility */
         font-size: 1.3em; 
         margin-bottom: 2.5rem; 
         text-align: center; /* Explicitly center align */
     }
     /* Specific styling for the H3 "Login as Administrator/User" title */
-    .st-emotion-cache-nahz7x { /* Target Streamlit's h3 class */
-        color: #000000 !important; /* Pure black for the login mode title - important for visibility */
+    /* Target h3 elements that might be Streamlit's generated headers */
+    h3 {
+        color: #000000 !important; /* Pure black for general h3 tags - IMPORTANT for visibility */
     }
-    /* Fallback if the above is not specific enough for h3 inside login form */
-    .st-emotion-cache-nahz7x + h3 { 
-        color: #000000 !important;
+    /* Even more specific targeting for the login form h3 */
+    .st-emotion-cache-nahz7x, .st-emotion-cache-nahz7x + h3 { 
+        color: #000000 !important; /* Pure black for the login mode title - IMPORTANT for visibility */
     }
 
 
@@ -237,14 +244,20 @@ st.markdown(
     .logged-in-main-content .stInfo, 
     .logged-in-main-content .stWarning,
     .logged-in-main-content .stError,
-    .logged-in-main-content label {
-        color: #000000 !important; /* Pure black for all general text and labels - important for visibility */
+    .logged-in-main-content label,
+    .logged-in-main-content .stSelectbox,
+    .logged-in-main-content .stRadio { /* Added selectbox and radio too */
+        color: #000000 !important; /* Pure black for all general text and labels - IMPORTANT for visibility */
     }
+    /* Ensure headings on logged-in pages are deep dark blue */
     .logged-in-main-content h1, 
     .logged-in-main-content h2, 
-    .logged-in-main-content h3 {
+    .logged-in-main-content h3,
+    .logged-in-main-content h4,
+    .logged-in-main-content h5,
+    .logged-in-main-content h6 {
         text-align: left; 
-        color: #0D47A1 !important; /* Deep Dark Blue for headings when logged in - important for visibility */
+        color: #0D47A1 !important; /* Deep Dark Blue for headings when logged in - IMPORTANT for visibility */
     }
     .logged-in-main-content .stForm {
         width: auto; 
@@ -763,7 +776,8 @@ def logout_user():
 # --- Streamlit Page Functions ---
 def dashboard_page():
     """Displays the user dashboard."""
-    st.title(f"Welcome, {st.session_state['user_name']}!")
+    # Applying color directly with markdown for st.title, as it's not a generic h1 but specific
+    st.markdown(f"<h1 style='color: #0D47A1 !important;'>Welcome, {st.session_state['user_name']}!</h1>", unsafe_allow_html=True)
     st.write("This is your dashboard. Use the sidebar to navigate.")
     st.info("To get started, navigate to 'Upload JD & CV' to perform a new AI-powered comparative analysis.")
     if st.session_state['is_admin']: # Only show for admin
@@ -772,7 +786,7 @@ def dashboard_page():
 
 def upload_jd_cv_page():
     """Handles JD and CV uploads, triggers AI review, and displays/downloads results."""
-    st.title("⬆️ Upload JD & CV for AI Review")
+    st.markdown("<h1 style='color: #0D47A1 !important;'>⬆️ Upload JD & CV for AI Review</h1>", unsafe_allow_html=True)
     st.write("Upload your Job Description and multiple Candidate CVs to start the comparative analysis.")
     print("DEBUG (upload_jd_cv_page): Displaying upload page.") 
 
@@ -965,7 +979,7 @@ def save_report_on_download(filename, docx_buffer, ai_result, jd_original_name, 
 
 def review_reports_page():
     """Displays a table of past reports fetched from Firestore for the current user."""
-    st.title("📚 Review Your Past Reports")
+    st.markdown("<h1 style='color: #0D47A1 !important;'>📚 Review Your Past Reports</h1>", unsafe_allow_html=True)
     st.write("Here you can find a history of your AI-generated comparative analysis reports.")
     print("DEBUG (review_reports_page): Displaying review reports page.") 
 
@@ -1015,14 +1029,14 @@ def review_reports_page():
 # --- Admin Pages ---
 def admin_dashboard_page():
     """Admin dashboard overview."""
-    st.title("⚙️ Admin Dashboard")
+    st.markdown("<h1 style='color: #0D47A1 !important;'>⚙️ Admin Dashboard</h1>", unsafe_allow_html=True)
     st.write("Welcome to the Admin Panel. From here you can manage users and all generated reports.")
     st.info("Use the sidebar navigation to access User Management, Report Management, or Invite New Member.")
     print("DEBUG (admin_dashboard_page): Displaying admin dashboard.") 
 
 def admin_user_management_page():
     """Admin page to manage users."""
-    st.title("👥 Admin: User Management")
+    st.markdown("<h1 style='color: #0D47A1 !important;'>👥 Admin: User Management</h1>", unsafe_allow_html=True)
     st.write("View, manage roles, or delete users.")
     print("DEBUG (admin_user_management_page): Displaying user management page.") 
 
@@ -1053,12 +1067,12 @@ def admin_user_management_page():
             st.dataframe(df_users, use_container_width=True, hide_index=True)
 
             st.markdown("---")
-            st.subheader("Manage User Actions")
+            st.markdown("<h3 style='color: #0D47A1 !important;'>Manage User Actions</h3>", unsafe_allow_html=True) # Changed to H3 with deep blue
 
             col1, col2 = st.columns(2) 
 
             with col1:
-                st.markdown("##### Toggle Admin Status")
+                st.markdown("<h5 style='color: #0D47A1 !important;'>Toggle Admin Status</h5>", unsafe_allow_html=True) # Changed to H5 with deep blue
                 user_email_toggle = st.text_input("User Email to Toggle Admin", key="toggle_admin_email")
                 if st.button("Toggle Admin Status", key="toggle_admin_button"):
                     if user_email_toggle:
@@ -1091,7 +1105,7 @@ def admin_user_management_page():
                         st.warning("Please enter a user email to toggle admin status.")
             
             with col2:
-                st.markdown("##### Delete User")
+                st.markdown("<h5 style='color: #0D47A1 !important;'>Delete User</h5>", unsafe_allow_html=True) # Changed to H5 with deep blue
                 user_email_delete = st.text_input("User Email to Delete", key="delete_user_email")
                 if st.button("Delete User", key="delete_user_button"):
                     if user_email_delete:
@@ -1146,7 +1160,7 @@ def admin_user_management_page():
 
 def admin_report_management_page():
     """Admin page to manage all reports."""
-    st.title("📊 Admin: Report Management")
+    st.markdown("<h1 style='color: #0D47A1 !important;'>📊 Admin: Report Management</h1>", unsafe_allow_html=True)
     st.write("View and delete all AI-generated comparative analysis reports.")
     print("DEBUG (admin_report_management_page): Displaying report management page.") 
 
@@ -1187,7 +1201,7 @@ def admin_report_management_page():
                          use_container_width=True)
 
             st.markdown("---")
-            st.subheader("Delete Report")
+            st.markdown("<h3 style='color: #0D47A1 !important;'>Delete Report</h3>", unsafe_allow_html=True) # Changed to H3 with deep blue
             report_id_to_delete = st.text_input("Enter Report ID to Delete (from table above)", key="delete_report_id")
             
             if st.button("Delete Report", key="delete_report_button"):
@@ -1231,7 +1245,7 @@ def admin_report_management_page():
 
 def admin_invite_member_page():
     """Admin page to invite and create new user accounts."""
-    st.title("➕ Admin: Invite New Member")
+    st.markdown("<h1 style='color: #0D47A1 !important;'>➕ Admin: Invite New Member</h1>", unsafe_allow_html=True)
     st.write("Create new user accounts directly and assign their initial role.")
     print("DEBUG (admin_invite_member_page): Displaying invite member page.") 
 
@@ -1328,7 +1342,7 @@ def admin_invite_member_page():
 
 def update_password_page():
     """Page for new users to update their temporary password."""
-    st.title("🔑 Update Your Password")
+    st.markdown("<h1 style='color: #0D47A1 !important;'>🔑 Update Your Password</h1>", unsafe_allow_html=True)
     st.write("As a new member, please set your personal password to continue.")
     print("DEBUG (update_password_page): Displaying update password page.") 
 
@@ -1514,7 +1528,7 @@ def main():
         if st.session_state['login_mode']:
             col_form_left, col_form_center, col_form_right = st.columns([1, 2, 1])
             with col_form_center: # Form in the middle column
-                # The h3 for login form title
+                # The h3 for login form title is explicitly targeted here
                 st.markdown(f"<h3 style='text-align: center; color: #000000 !important;'>🔑 Login as {'Administrator' if st.session_state['login_mode'] == 'admin' else 'User'}</h3>", unsafe_allow_html=True) 
                 with st.form("login_form"):
                     email = st.text_input("Email")
@@ -1536,7 +1550,7 @@ def main():
             left: 0;
             width: 100%;
             text-align: center;
-            color: #FF8C00; /* Orange text for footer */
+            color: #FF8C00 !important; /* Orange text for footer - IMPORTANT for visibility */
             padding: 10px;
             background-color: #FFFFFF; /* Match page background */
             font-size: 0.8em;
