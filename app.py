@@ -37,10 +37,10 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* General body styling for dark theme */
+    /* General body styling for light theme */
     body {
-        background-color: #1A1A1A; /* Very dark gray background for the overall app */
-        color: #F0F0F0; /* Light text for readability */
+        background-color: #FFFFFF; /* Pure white background */
+        color: #333333; /* Darker text for general readability */
         font-family: 'Inter', sans-serif;
     }
 
@@ -52,25 +52,24 @@ st.markdown(
         display: none; /* We will render our own custom footer */
     }
 
-    /* Main content container background - ensuring it's dark */
+    /* Main content container background - ensuring it's white */
     .stApp {
-        background-color: #1A1A1A;
+        background-color: #FFFFFF;
     }
 
     /* Target specific Streamlit classes for main content block */
-    /* This targets the container that holds your main content (outside sidebar) */
     .css-18e3th9 { /* Main content container */
-        background-color: #1A1A1A; /* Match main content background */
-        padding-top: 0rem; /* Adjust padding as title is now top-level */
+        background-color: #FFFFFF; /* Match main content background */
+        padding-top: 0rem; 
         padding-bottom: 0rem;
     }
     .css-1d3f8gv { /* This class holds the main block for the app */
-        background-color: #1A1A1A; /* Match main content background */
+        background-color: #FFFFFF; /* Match main content background */
     }
 
     /* Customizing the sidebar - It will only appear when logged in */
     .css-1lcbmhc { /* Sidebar container */
-        background-color: #212529; /* Darker sidebar background for strong contrast */
+        background-color: #212529; /* Dark sidebar background for strong contrast */
         color: white;
         padding-top: 2rem;
         padding-bottom: 2rem;
@@ -100,7 +99,7 @@ st.markdown(
         padding: 0.75rem 1.5rem;
         font-size: 1.1rem;
         border: none;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); /* Darker shadow for dark theme */
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         transition: all 0.3s ease;
         margin: 0.75rem; /* Increased margin for better spacing */
         min-width: 180px; /* Ensure buttons have a consistent minimum width */
@@ -114,36 +113,35 @@ st.markdown(
     .stForm {
         padding: 2rem;
         border-radius: 0.75rem;
-        background-color: white; /* White background for the form card (contrasts dark background) */
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.25); /* More prominent shadow for dark theme */
+        background-color: #FFFFFF; /* White background for the form card */
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
         margin-top: 2rem;
         width: 100%; /* Ensure form takes full width of its column */
         max-width: 500px; /* Limit form width for better appearance on large screens */
     }
-    .stTextInput > label, .stSelectbox > label, .stRadio > label {
+    /* Labels and input fields within the form */
+    .stForm .stTextInput > label, .stForm .stSelectbox > label, .stForm .stRadio > label {
         font-weight: bold;
-        color: #F0F0F0; /* Light text for labels on dark background */
-        margin-bottom: 0.5rem; /* Spacing for labels */
+        color: #333333; /* Dark text for labels on white form background */
+        margin-bottom: 0.5rem;
     }
-    /* Input fields within the form should have dark text on a white background */
     .stForm .stTextInput input[type="text"], .stForm .stTextInput input[type="password"] {
         color: #333333; /* Dark text for input fields */
-        background-color: white; /* White background for input fields */
+        background-color: #F8F8F8; /* Very light gray for input background */
         border-radius: 0.5rem;
         border: 1px solid #ced4da;
         padding: 0.75rem 1rem;
         width: 100%;
-        margin-bottom: 1rem; /* Spacing for inputs */
+        margin-bottom: 1rem;
     }
     .stTextInput input:focus {
         border-color: #1976D2; /* Focus color matching logo blue */
-        box-shadow: 0 0 0 0.2rem rgba(25, 118, 210, 0.25); /* Light blue shadow */
+        box-shadow: 0 0 0 0.2rem rgba(25, 118, 210, 0.25); 
     }
-    /* Specific styling for labels outside forms, e.g., the JD/CV upload labels */
-    .stFileUploader label {
-        color: #F0F0F0; /* Light label for file uploaders on dark background */
+    /* General labels outside forms, e.g., the JD/CV upload labels */
+    label {
+        color: #333333; /* Dark text for general labels */
     }
-
 
     /* Success/Error/Warning messages */
     .stAlert {
@@ -169,8 +167,8 @@ st.markdown(
     /* Specific style for the initial info message on login page */
     .initial-info-message {
         font-size: 1.1em;
-        color: #CCCCCC; /* Lighter gray for better visibility on dark background */
-        margin-top: 1.5rem; /* More spacing below buttons */
+        color: #555555; /* Medium gray for readability */
+        margin-top: 1.5rem; 
         margin-bottom: 2rem;
         font-style: italic;
     }
@@ -179,33 +177,42 @@ st.markdown(
     .st-emotion-cache-16txt4v { 
         display: flex;
         flex-direction: column;
-        align-items: center;
-        justify-content: flex-start; 
-        min-height: 90vh; 
-        padding-top: 4rem; /* Increased padding top for main content */
+        align-items: center; /* Center horizontally */
+        justify-content: flex-start; /* Align from top vertically */
+        min-height: 90vh; /* Ensure content pushes footer down on shorter pages */
+        padding-top: 3.5rem; /* Adjusted padding from top for the main title */
     }
 
     /* Styling for the central main title */
     .main-app-title {
-        color: #F0F0F0; /* Light text for dark background */
+        color: #1976D2; /* Blue text for main title */
         font-size: 2.8em; 
         font-weight: bold;
         margin-bottom: 0.5rem; 
-        padding-top: 0rem; /* This padding is now handled by parent container's padding-top */
+        text-align: center; /* Explicitly center align */
     }
     .sub-app-title {
-        color: #CCCCCC; /* Slightly darker light text for subtitle */
+        color: #1976D2; /* Blue text for subtitle */
         font-size: 1.3em; 
         margin-bottom: 2.5rem; 
+        text-align: center; /* Explicitly center align */
     }
+    /* Specific styling for the H3 "Login as Administrator/User" title */
+    .st-emotion-cache-nahz7x { /* Target Streamlit's h3 class if custom styles don't apply */
+        color: #1976D2; /* Blue for the login mode title */
+    }
+    .st-emotion-cache-nahz7x + h3 { /* More specific selector if needed for the login form h3 */
+        color: #1976D2 !important;
+    }
+
 
     /* Top-right logo container */
     .top-right-logo {
         position: fixed; 
         top: 10px; 
         right: 10px; 
-        z-index: 9999; /* Increased z-index for maximum visibility */
-        background-color: rgba(255, 255, 255, 0.0); /* Transparent background */
+        z-index: 9999; 
+        background-color: rgba(255, 255, 255, 0.0); 
         padding: 5px;
         border-radius: 8px;
         border: 2px solid red; /* *** DEBUGGING BORDER - REMOVE LATER *** */
@@ -217,7 +224,7 @@ st.markdown(
 
     /* Adjust padding/alignment for logged in pages, overriding centering for content */
     .logged-in-main-content .st-emotion-cache-16txt4v {
-        align-items: flex-start; 
+        align-items: flex-start; /* Reset to left align */
         padding-top: 2rem; 
         text-align: left;
         margin-left: 1rem; 
@@ -230,13 +237,16 @@ st.markdown(
     }
     .logged-in-main-content h1, .logged-in-main-content h2, .logged-in-main-content h3 {
         text-align: left; 
-        color: #F0F0F0; /* Headings also light when logged in */
+        color: #333333; /* Dark text for headings when logged in */
     }
     .logged-in-main-content p {
-        color: #CCCCCC; /* Paragraphs also light when logged in */
+        color: #333333; /* Dark text for paragraphs when logged in */
     }
     .logged-in-main-content .stInfo { /* For st.info when logged in */
-        color: #BBBBBB;
+        color: #555555; /* Medium gray for logged in info messages */
+    }
+    .logged-in-main-content .stTextInput > label, .logged-in-main-content .stSelectbox > label {
+        color: #333333; /* Dark text for labels in logged in forms */
     }
 
 
@@ -256,7 +266,7 @@ st.markdown(
 )
 
 # --- Inject Top-Right Logo HTML ---
-# IMPORTANT: src path is 'app/static/logo.png'
+# IMPORTANT: src path is 'app/static/logo.png'. Keeping red border for debugging.
 st.markdown(
     f"""
     <div class="top-right-logo">
@@ -286,10 +296,9 @@ def initialize_firebase_app():
         print(f"DEBUG: Fetched secret. Length: {len(firebase_service_account_key_base64_raw)} chars. Starts with: {firebase_service_account_key_base64_raw[:50]}")
         
         decoded_key_bytes = base64.urlsafe_b64decode(firebase_service_account_key_base64_raw.encode('utf-8'))
-        print(f"DEBUG: Base64 decoded to bytes. Length: {len(decoded_key_bytes)} bytes.")
-
-        FIREBASE_SERVICE_ACCOUNT_CONFIG = json.loads(decoded_key_bytes)
         print("DEBUG: Decoded bytes parsed to JSON successfully.")
+        
+        FIREBASE_SERVICE_ACCOUNT_CONFIG = json.loads(decoded_key_bytes)
         
         cred = credentials.Certificate(FIREBASE_SERVICE_ACCOUNT_CONFIG)
         print("DEBUG: Firebase credentials created.")
@@ -435,7 +444,7 @@ def get_comparative_ai_analysis(jd_text, all_cv_data):
           "Match %": "...",              // Numerical percentage as a string (e.g., "85%")
           "Ranking": "...",              // E.g., "1", "2", "3", etc. (NO MEDALS)
           "Shortlist Probability": "...",// E.g., "High", "Moderate", "Low"
-          "Key Strengths": "...",        // Concise points, comma-separated or short phrase. Highlight relevant experience.
+          "Key Strengths": "...",        // Concise points, comma-separated or short phrase. Highlight relevant relevant experience.
           "Key Gaps": "...",             // Concise points, comma-separated or short phrase.
           "Location Suitability": "...", // E.g., "Pune", "Delhi (flexible)", "Remote", "Not Specified"
           "Comments": "..."              // Any other relevant observation for this candidate, including fit for Indian context.
@@ -1154,7 +1163,7 @@ def admin_report_management_page():
             report_id = doc.id
             report_info = doc.to_dict()
             all_reports_data.append({
-                "Report ID": report_id,
+                "Report ID": doc.id, 
                 "Report Name": report_info.get('outputDocFileName', 'N/A'),
                 "Uploaded By": report_info.get('user_name', 'N/A'),
                 "Uploader Email": report_info.get('user_email', 'N/A'),
@@ -1162,7 +1171,7 @@ def admin_report_management_page():
                 "CV Filenames": ", ".join(report_info.get('cv_filenames', [])),
                 "Date Generated": report_info.get('review_date_human', 'N/A'),
                 "Summary": report_info.get('summary', 'No summary provided.'),
-                "Download Link": report_info.get('outputDocURL', '')
+                "Download Link": report_info.get('outputDocURL', '') 
             })
         
         if all_reports_data:
@@ -1446,7 +1455,6 @@ def main():
                 logout_user()
         
         # Add a div to the main content area for logged-in users to override centering if needed
-        # This allows per-page styling for the main content without affecting the login page.
         st.markdown('<div class="logged-in-main-content">', unsafe_allow_html=True)
         
         # --- Render Logged-in Pages ---
@@ -1474,7 +1482,6 @@ def main():
     
     # --- Main Content Area when NOT logged in (Login/Landing Page) ---
     else: 
-        # The central alignment is handled by the CSS for the primary Streamlit container
         st.markdown("<h1 class='main-app-title'>SSO Consultants AI Recruitment System</h1>", unsafe_allow_html=True)
         st.markdown("<p class='sub-app-title'>Streamlined Talent Acquisition with AI-Powered Insights</p>", unsafe_allow_html=True)
         
@@ -1505,7 +1512,8 @@ def main():
         if st.session_state['login_mode']:
             col_form_left, col_form_center, col_form_right = st.columns([1, 2, 1])
             with col_form_center: # Form in the middle column
-                st.markdown(f"<h3 style='text-align: center; color: #F0F0F0;'>🔑 Login as {'Administrator' if st.session_state['login_mode'] == 'admin' else 'User'}</h3>", unsafe_allow_html=True) # Text also light
+                # The h3 for login form title
+                st.markdown(f"<h3 style='text-align: center; color: #1976D2;'>🔑 Login as {'Administrator' if st.session_state['login_mode'] == 'admin' else 'User'}</h3>", unsafe_allow_html=True) 
                 with st.form("login_form"):
                     email = st.text_input("Email")
                     password = st.text_input("Password", type="password")
@@ -1526,11 +1534,11 @@ def main():
             left: 0;
             width: 100%;
             text-align: center;
-            color: #BBBBBB; /* Light gray for footer text on dark background */
+            color: #FF8C00; /* Orange text for footer */
             padding: 10px;
-            background-color: #1A1A1A; /* Match page background */
+            background-color: #FFFFFF; /* Match page background */
             font-size: 0.8em;
-            border-top: 1px solid #333333; /* Subtle border for separation */
+            border-top: 1px solid #E0E0E0; /* Subtle border for separation */
             z-index: 999; 
         ">
             ©copyright SSO Consultants
