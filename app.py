@@ -334,7 +334,10 @@ st.markdown(
 )
 
 # --- Configuration: NOW READING FROM STREAMLIT SECRETS ---
-FIREBASE_STORAGE_BUCKET_NAME = 'ecr-app-drive-integration.appspot.com' 
+# >>>>>>>>>>>>>>>>>>>>>>>>>> IMPORTANT: THIS MUST BE YOUR ACTUAL FIREBASE STORAGE BUCKET NAME <<<<<<<<<<<<<<<<<<<<<<<<<<<<
+# You can find this in your Firebase Console under "Storage" -> "Files" tab, look for "Your bucket" name.
+# It is CONFIRMED to be 'ecr-app-drive-integration.appspot.com' from your screenshot.
+FIREBASE_STORAGE_BUCKET_NAME = 'ecr-app-drive-integration.appspot.com' # CONFIRMED FROM YOUR SCREENSHOT
 
 # --- Firebase Initialization Function ---
 def initialize_firebase_app():
@@ -931,7 +934,7 @@ def upload_jd_cv_page():
                 label="Download & Save DOCX Report ⬇️☁️", 
                 data=st.session_state['generated_docx_buffer'],
                 file_name=download_filename,
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", # Corrected MIME type
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
                 key="download_and_save_docx",
                 on_click=lambda: save_report_on_download(
                     download_filename,
@@ -954,16 +957,18 @@ def save_report_on_download(filename, docx_buffer, ai_result, jd_original_name, 
         print("ERROR (save_report_on_download): Firebase clients are None. Cannot save report.")
         return
 
-    print(f"DEBUG (save_report_on_download): Current bucket name from session_state: {bucket.name}") 
+    # Debug print to confirm the bucket name being used
+    print(f"DEBUG (save_report_on_download): Using bucket name: {FIREBASE_STORAGE_BUCKET_NAME}")
     
     storage_file_path = f"jd_cv_reports/{st.session_state['user_uid']}/{filename}"
     download_url = None 
 
     try:
         print(f"DEBUG (save_report_on_download): Attempting to upload file to Storage at: {storage_file_path}") 
+        # Create blob using the bucket object from session_state
         blob = bucket.blob(storage_file_path) 
         docx_buffer.seek(0) 
-        blob.upload_from_string(docx_buffer.getvalue(), content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document") # Corrected MIME type
+        blob.upload_from_string(docx_buffer.getvalue(), content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
         
         blob.make_public() 
         download_url = blob.public_url
@@ -1003,7 +1008,7 @@ def save_report_on_download(filename, docx_buffer, ai_result, jd_original_name, 
             if download_url:
                 try:
                     blob.delete()
-                    print("DEBUG: Deleted file from Storage due to generic Firestore save failure.")
+                    print(f"DEBUG: Deleted file from Storage due to generic Firestore save failure. Error during delete: {e_del}") # Added e_del to log
                 except Exception as e_del:
                     print(f"ERROR: Failed to delete Storage file after generic error: {e_del}")
 
@@ -1035,6 +1040,7 @@ def review_reports_page():
 
     try:
         print(f"DEBUG (review_reports_page): Fetching reports for UID: {st.session_state['user_uid']}") 
+        # Querying reports for the current user, ordered by review_date
         reports_ref = db.collection('jd_cv_reports').where('user_uid', '==', st.session_state['user_uid']).order_by('review_date', direction=firestore.Query.DESCENDING) 
         docs = reports_ref.stream() 
 
@@ -1063,18 +1069,20 @@ def review_reports_page():
         else:
             st.info("No reports found yet for your account. Start by uploading JD & CVs!")
             print("DEBUG (review_reports_page): No reports found for this user.") 
-    except exceptions.FirebaseError as e: # Catch specific Firebase errors
+    except exceptions.FirebaseError as e: # Catch specific Firebase errors for better user guidance
         error_message = str(e)
         if "The query requires an index" in error_message:
+            index_link_match = re.search(r'https://console\.firebase\.google\.com/v1/r/project/[^"]+', error_message)
+            index_link = index_link_match.group(0) if index_link_match else "your Firebase console -> Firestore Database -> Indexes tab."
             st.error(f"""
             **Error: Database Index Missing!**
-            To view reports, a special database index is required. This happens when filtering and sorting data simultaneously.
+            To view reports, a specific database index is required by Firebase when filtering and sorting.
             
             Please click the link below to create the index in your Firebase console:
             
-            **[Create Firestore Index Here]({error_message.split("You can create it here: ")[1].strip()})**
+            **[Create Firestore Index Here]({index_link})**
             
-            After clicking the link and creating the index, please allow a few minutes for it to activate, then refresh this page.
+            After clicking the link and creating the index, please allow a few minutes for it to activate (status will change from "Building" to "Enabled"), then refresh this page.
             """)
             print(f"ERROR (review_reports_page): Firebase Indexing Error: {e}") 
         else:
@@ -1231,6 +1239,7 @@ def admin_report_management_page():
     all_reports_data = []
     try:
         print(f"DEBUG (admin_report_management_page): Fetching all reports from Firestore.") 
+        # Querying all reports, ordered by review_date
         reports_ref = db.collection('jd_cv_reports').order_by('review_date', direction=firestore.Query.DESCENDING) 
         docs = reports_ref.stream()
 
@@ -1298,16 +1307,20 @@ def admin_report_management_page():
             st.info("No reports found in the database.")
             print("DEBUG (admin_report_management_page): No reports found in database.") 
 
-    except exceptions.FirebaseError as e: # Catch specific Firebase errors
+    except exceptions.FirebaseError as e: # Catch specific Firebase errors for better user guidance
         error_message = str(e)
         if "The query requires an index" in error_message:
+            index_link_match = re.search(r'https://console\.firebase\.google\.com/v1/r/project/[^"]+', error_message)
+            index_link = index_link_match.group(0) if index_link_match else "your Firebase console -> Firestore Database -> Indexes tab."
             st.error(f"""
             **Error: Database Index Missing for Admin Reports!**
-            To view ALL reports, a special database index is required. This happens when sorting data without a direct filter.
+            To view ALL reports, a specific database index is required by Firebase when ordering.
             
-            Please check your Firebase console for a link to create the index, or manually create an index on `review_date` (descending) for the `jd_cv_reports` collection.
+            Please click the link below to create the index in your Firebase console:
             
-            After creating the index, please allow a few minutes for it to activate, then refresh this page.
+            **[Create Firestore Index Here]({index_link})**
+            
+            After clicking the link and creating the index, please allow a few minutes for it to activate (status will change from "Building" to "Enabled"), then refresh this page.
             """)
             print(f"ERROR (admin_report_management_page): Firebase Indexing Error: {e}") 
         else:
