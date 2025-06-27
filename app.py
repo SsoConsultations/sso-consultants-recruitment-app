@@ -37,10 +37,10 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* General body styling for light theme */
+    /* General body styling for dark theme */
     body {
-        background-color: #F8F8F8; /* Lighter off-white background for the overall app */
-        color: #333333; /* Darker text for readability */
+        background-color: #1A1A1A; /* Very dark gray background for the overall app */
+        color: #F0F0F0; /* Light text for readability */
         font-family: 'Inter', sans-serif;
     }
 
@@ -52,20 +52,20 @@ st.markdown(
         display: none; /* We will render our own custom footer */
     }
 
-    /* Main content container background - ensuring it's light */
+    /* Main content container background - ensuring it's dark */
     .stApp {
-        background-color: #F8F8F8;
+        background-color: #1A1A1A;
     }
 
     /* Target specific Streamlit classes for main content block */
     /* This targets the container that holds your main content (outside sidebar) */
     .css-18e3th9 { /* Main content container */
-        background-color: #F8F8F8; /* Match main content background */
+        background-color: #1A1A1A; /* Match main content background */
         padding-top: 0rem; /* Adjust padding as title is now top-level */
         padding-bottom: 0rem;
     }
     .css-1d3f8gv { /* This class holds the main block for the app */
-        background-color: #F8F8F8; /* Match main content background */
+        background-color: #1A1A1A; /* Match main content background */
     }
 
     /* Customizing the sidebar - It will only appear when logged in */
@@ -100,7 +100,7 @@ st.markdown(
         padding: 0.75rem 1.5rem;
         font-size: 1.1rem;
         border: none;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2); /* Darker shadow for dark theme */
         transition: all 0.3s ease;
         margin: 0.75rem; /* Increased margin for better spacing */
         min-width: 180px; /* Ensure buttons have a consistent minimum width */
@@ -114,18 +114,21 @@ st.markdown(
     .stForm {
         padding: 2rem;
         border-radius: 0.75rem;
-        background-color: white; /* White background for the form card */
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        background-color: white; /* White background for the form card (contrasts dark background) */
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.25); /* More prominent shadow for dark theme */
         margin-top: 2rem;
         width: 100%; /* Ensure form takes full width of its column */
         max-width: 500px; /* Limit form width for better appearance on large screens */
     }
     .stTextInput > label, .stSelectbox > label, .stRadio > label {
         font-weight: bold;
-        color: #333333;
+        color: #F0F0F0; /* Light text for labels on dark background */
         margin-bottom: 0.5rem; /* Spacing for labels */
     }
-    .stTextInput input[type="text"], .stTextInput input[type="password"] {
+    /* Input fields within the form should have dark text on a white background */
+    .stForm .stTextInput input[type="text"], .stForm .stTextInput input[type="password"] {
+        color: #333333; /* Dark text for input fields */
+        background-color: white; /* White background for input fields */
         border-radius: 0.5rem;
         border: 1px solid #ced4da;
         padding: 0.75rem 1rem;
@@ -136,6 +139,11 @@ st.markdown(
         border-color: #1976D2; /* Focus color matching logo blue */
         box-shadow: 0 0 0 0.2rem rgba(25, 118, 210, 0.25); /* Light blue shadow */
     }
+    /* Specific styling for labels outside forms, e.g., the JD/CV upload labels */
+    .stFileUploader label {
+        color: #F0F0F0; /* Light label for file uploaders on dark background */
+    }
+
 
     /* Success/Error/Warning messages */
     .stAlert {
@@ -144,31 +152,30 @@ st.markdown(
         margin-bottom: 1rem;
     }
     .stAlert.success {
-        background-color: #d4edda;
-        color: #155724;
+        background-color: #d4edda; /* Light green */
+        color: #155724; /* Dark green text */
         border-color: #c3e6cb;
     }
     .stAlert.error {
-        background-color: #f8d7da;
-        color: #721c24;
+        background-color: #f8d7da; /* Light red */
+        color: #721c24; /* Dark red text */
         border-color: #f5c6cb;
     }
     .stAlert.warning {
-        background-color: #fff3cd;
-        color: #856404;
+        background-color: #fff3cd; /* Light yellow */
+        color: #856404; /* Dark yellow text */
         border-color: #ffeeba;
     }
-    /* Specific style for the initial info message */
+    /* Specific style for the initial info message on login page */
     .initial-info-message {
         font-size: 1.1em;
-        color: #555555; /* Darker gray for better visibility */
+        color: #CCCCCC; /* Lighter gray for better visibility on dark background */
         margin-top: 1.5rem; /* More spacing below buttons */
         margin-bottom: 2rem;
         font-style: italic;
     }
 
     /* Centering content within a column (applied to Streamlit's main block) */
-    /* *** ADJUSTED FOR BETTER VISIBILITY OF HEADER ELEMENTS *** */
     .st-emotion-cache-16txt4v { 
         display: flex;
         flex-direction: column;
@@ -180,14 +187,14 @@ st.markdown(
 
     /* Styling for the central main title */
     .main-app-title {
-        color: #333333; 
+        color: #F0F0F0; /* Light text for dark background */
         font-size: 2.8em; 
         font-weight: bold;
         margin-bottom: 0.5rem; 
         padding-top: 0rem; /* This padding is now handled by parent container's padding-top */
     }
     .sub-app-title {
-        color: #555555; 
+        color: #CCCCCC; /* Slightly darker light text for subtitle */
         font-size: 1.3em; 
         margin-bottom: 2.5rem; 
     }
@@ -195,10 +202,10 @@ st.markdown(
     /* Top-right logo container */
     .top-right-logo {
         position: fixed; 
-        top: 10px; /* Adjusted closer to top */
-        right: 10px; /* Adjusted closer to right */
+        top: 10px; 
+        right: 10px; 
         z-index: 9999; /* Increased z-index for maximum visibility */
-        background-color: rgba(255, 255, 255, 0.0); 
+        background-color: rgba(255, 255, 255, 0.0); /* Transparent background */
         padding: 5px;
         border-radius: 8px;
         border: 2px solid red; /* *** DEBUGGING BORDER - REMOVE LATER *** */
@@ -223,8 +230,15 @@ st.markdown(
     }
     .logged-in-main-content h1, .logged-in-main-content h2, .logged-in-main-content h3 {
         text-align: left; 
-        color: #333333;
+        color: #F0F0F0; /* Headings also light when logged in */
     }
+    .logged-in-main-content p {
+        color: #CCCCCC; /* Paragraphs also light when logged in */
+    }
+    .logged-in-main-content .stInfo { /* For st.info when logged in */
+        color: #BBBBBB;
+    }
+
 
     /* Hide the default Streamlit hamburger menu button and Share button */
     .css-hi6a2p { 
@@ -242,7 +256,7 @@ st.markdown(
 )
 
 # --- Inject Top-Right Logo HTML ---
-# IMPORTANT: Updated src path to point to 'app/static/logo.png'
+# IMPORTANT: src path is 'app/static/logo.png'
 st.markdown(
     f"""
     <div class="top-right-logo">
@@ -865,7 +879,7 @@ def upload_jd_cv_page():
 
 def save_report_on_download(filename, docx_buffer, ai_result, jd_original_name, cv_original_names):
     """Saves the report to Firebase Storage and Firestore metadata."""
-    st.info("Attempting to save report to cloud... (This message will disappear shortly)") # Added clarification 
+    st.info("Attempting to save report to cloud... (This message will disappear shortly)") 
     print("DEBUG (save_report_on_download): Function started. User UID:", st.session_state.get('user_uid', 'N/A')) 
     
     if db is None or bucket is None:
@@ -1153,8 +1167,8 @@ def admin_report_management_page():
         
         if all_reports_data:
             print(f"DEBUG (admin_report_management_page): Found {len(all_reports_data)} reports.") 
-            df_reports = pd.DataFrame(all_reports_data)
-            st.dataframe(df_reports,
+            df = pd.DataFrame(all_reports_data)
+            st.dataframe(df,
                          column_config={
                              "Download Link": st.column_config.LinkColumn("Download File", display_text="⬇️ Download", help="Click to download the report file")
                          },
@@ -1491,7 +1505,7 @@ def main():
         if st.session_state['login_mode']:
             col_form_left, col_form_center, col_form_right = st.columns([1, 2, 1])
             with col_form_center: # Form in the middle column
-                st.markdown(f"<h3 style='text-align: center; color: #333333;'>🔑 Login as {'Administrator' if st.session_state['login_mode'] == 'admin' else 'User'}</h3>", unsafe_allow_html=True)
+                st.markdown(f"<h3 style='text-align: center; color: #F0F0F0;'>🔑 Login as {'Administrator' if st.session_state['login_mode'] == 'admin' else 'User'}</h3>", unsafe_allow_html=True) # Text also light
                 with st.form("login_form"):
                     email = st.text_input("Email")
                     password = st.text_input("Password", type="password")
@@ -1512,12 +1526,12 @@ def main():
             left: 0;
             width: 100%;
             text-align: center;
-            color: #666666; /* Adjust color for light theme */
+            color: #BBBBBB; /* Light gray for footer text on dark background */
             padding: 10px;
-            background-color: #F8F8F8; /* Match page background */
+            background-color: #1A1A1A; /* Match page background */
             font-size: 0.8em;
-            border-top: 1px solid #e0e0e0; /* Subtle border */
-            z-index: 999; /* Ensure it's above other content but below logo */
+            border-top: 1px solid #333333; /* Subtle border for separation */
+            z-index: 999; 
         ">
             ©copyright SSO Consultants
         </div>
