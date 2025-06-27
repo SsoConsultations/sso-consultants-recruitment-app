@@ -40,7 +40,7 @@ st.markdown(
     /* General body styling for light theme */
     body {
         background-color: #FFFFFF; /* Pure white background */
-        color: #333333; /* Dark charcoal for general text readability */
+        color: #222222; /* Very dark charcoal for general text readability */
         font-family: 'Inter', sans-serif;
     }
 
@@ -140,7 +140,7 @@ st.markdown(
     }
     /* General labels outside forms, e.g., the JD/CV upload labels */
     label {
-        color: #333333; /* Dark text for general labels */
+        color: #222222; /* Very dark charcoal for general labels */
     }
 
     /* Success/Error/Warning messages */
@@ -167,7 +167,7 @@ st.markdown(
     /* Specific style for the initial info message on login page */
     .initial-info-message {
         font-size: 1.1em;
-        color: #333333; /* Dark charcoal for clear visibility */
+        color: #222222; /* Very dark charcoal for clear visibility */
         margin-top: 1.5rem; 
         margin-bottom: 2rem;
         font-style: italic;
@@ -199,11 +199,11 @@ st.markdown(
     }
     /* Specific styling for the H3 "Login as Administrator/User" title */
     .st-emotion-cache-nahz7x { /* Target Streamlit's h3 class */
-        color: #0D47A1 !important; /* Deep Dark Blue for the login mode title */
+        color: #333333 !important; /* Dark charcoal for the login mode title */
     }
-    /* If the above is not specific enough, this targets h3 right after a specific Streamlit container */
+    /* Fallback if the above is not specific enough for h3 inside login form */
     .st-emotion-cache-nahz7x + h3 { 
-        color: #0D47A1 !important;
+        color: #333333 !important;
     }
 
 
@@ -232,22 +232,17 @@ st.markdown(
         margin-right: 1rem; 
         width: calc(100% - 2rem); 
     }
-    .logged-in-main-content .st-emotion-cache-16txt4v .stForm {
-        width: auto; 
-        max-width: none; 
+    /* Ensure general text within logged-in content is dark charcoal */
+    .logged-in-main-content p, .logged-in-main-content .stInfo, .logged-in-main-content label {
+        color: #222222 !important; 
     }
     .logged-in-main-content h1, .logged-in-main-content h2, .logged-in-main-content h3 {
         text-align: left; 
-        color: #333333; /* Dark text for headings when logged in */
+        color: #0D47A1 !important; /* Deep Dark Blue for headings when logged in */
     }
-    .logged-in-main-content p {
-        color: #333333; /* Dark text for paragraphs when logged in */
-    }
-    .logged-in-main-content .stInfo { /* For st.info when logged in */
-        color: #555555; /* Medium gray for logged in info messages */
-    }
-    .logged-in-main-content .stTextInput > label, .logged-in-main-content .stSelectbox > label {
-        color: #333333; /* Dark text for labels in logged in forms */
+    .logged-in-main-content .stForm {
+        width: auto; 
+        max-width: none; 
     }
 
 
