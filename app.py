@@ -39,7 +39,7 @@ st.markdown(
     <style>
     /* General body styling for light theme */
     body {
-        background-color: #f0f2f6; /* Light gray background for the overall app */
+        background-color: #F8F8F8; /* Lighter off-white background for the overall app */
         color: #333333; /* Darker text for readability */
         font-family: 'Inter', sans-serif;
     }
@@ -52,26 +52,25 @@ st.markdown(
         display: none; /* We will render our own custom footer */
     }
 
-    /* Main content container */
+    /* Main content container background - ensuring it's light */
     .stApp {
-        background-color: #f0f2f6; /* Ensure main app area has light background */
+        background-color: #F8F8F8;
     }
 
-    /* Specific Streamlit classes for the main content block */
+    /* Target specific Streamlit classes for main content block */
     /* This targets the container that holds your main content (outside sidebar) */
-    .css-18e3th9 { /* This class might change in future Streamlit versions */
-        background-color: #f0f2f6; /* Match main content background */
+    .css-18e3th9 { /* Main content container */
+        background-color: #F8F8F8; /* Match main content background */
         padding-top: 0rem; /* Adjust padding as title is now top-level */
         padding-bottom: 0rem;
     }
     .css-1d3f8gv { /* This class holds the main block for the app */
-        background-color: #f0f2f6; /* Match main content background */
+        background-color: #F8F8F8; /* Match main content background */
     }
-
 
     /* Customizing the sidebar - It will only appear when logged in */
     .css-1lcbmhc { /* Sidebar container */
-        background-color: #212529; /* Darker sidebar background */
+        background-color: #212529; /* Darker sidebar background for strong contrast */
         color: white;
         padding-top: 2rem;
         padding-bottom: 2rem;
@@ -80,7 +79,7 @@ st.markdown(
         color: white; /* Radio button labels in sidebar */
     }
     .css-1lcbmhc .stButton > button {
-        background-color: #007bff; /* Blue button in sidebar */
+        background-color: #0D47A1; /* Deep blue from logo for sidebar buttons */
         color: white;
         border-radius: 0.5rem;
         border: none;
@@ -95,7 +94,7 @@ st.markdown(
 
     /* Styling for the main login buttons (Login as Admin, Login as User) */
     .stButton > button {
-        background-color: #007bff; /* Primary blue */
+        background-color: #1976D2; /* Vibrant blue from logo for main action buttons */
         color: white;
         border-radius: 0.5rem;
         padding: 0.75rem 1.5rem;
@@ -103,10 +102,11 @@ st.markdown(
         border: none;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         transition: all 0.3s ease;
-        margin: 0.5rem; /* Add margin between buttons */
+        margin: 0.75rem; /* Increased margin for better spacing */
+        min-width: 180px; /* Ensure buttons have a consistent minimum width */
     }
     .stButton > button:hover {
-        background-color: #0056b3; /* Darker blue on hover */
+        background-color: #0D47A1; /* Darker blue on hover */
         transform: translateY(-2px);
     }
 
@@ -115,28 +115,33 @@ st.markdown(
         padding: 2rem;
         border-radius: 0.75rem;
         background-color: white; /* White background for the form card */
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
         margin-top: 2rem;
         width: 100%; /* Ensure form takes full width of its column */
+        max-width: 500px; /* Limit form width for better appearance on large screens */
     }
     .stTextInput > label, .stSelectbox > label, .stRadio > label {
         font-weight: bold;
         color: #333333;
+        margin-bottom: 0.5rem; /* Spacing for labels */
     }
     .stTextInput input[type="text"], .stTextInput input[type="password"] {
         border-radius: 0.5rem;
         border: 1px solid #ced4da;
         padding: 0.75rem 1rem;
         width: 100%;
+        margin-bottom: 1rem; /* Spacing for inputs */
     }
     .stTextInput input:focus {
-        border-color: #007bff;
-        box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        border-color: #1976D2; /* Focus color matching logo blue */
+        box-shadow: 0 0 0 0.2rem rgba(25, 118, 210, 0.25); /* Light blue shadow */
     }
 
     /* Success/Error/Warning messages */
     .stAlert {
         border-radius: 0.5rem;
+        margin-top: 1rem;
+        margin-bottom: 1rem;
     }
     .stAlert.success {
         background-color: #d4edda;
@@ -153,54 +158,70 @@ st.markdown(
         color: #856404;
         border-color: #ffeeba;
     }
+    /* Specific style for the initial info message */
+    .initial-info-message {
+        font-size: 1.1em;
+        color: #555555; /* Darker gray for better visibility */
+        margin-top: 1.5rem; /* More spacing below buttons */
+        margin-bottom: 2rem;
+        font-style: italic;
+    }
 
-    /* Centering content within a column */
-    .st-emotion-cache-16txt4v { /* This targets Streamlit's main content block */
+    /* Centering content within a column (applied to Streamlit's main block) */
+    .st-emotion-cache-16txt4v { 
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: center;
-        text-align: center;
-        padding-top: 0; /* Remove default padding as title is now top-level */
+        justify-content: flex-start; /* Align from top, not center */
+        min-height: 90vh; /* Ensure content pushes footer down on shorter pages */
+        padding-top: 0; 
     }
 
     /* Styling for the central main title */
     .main-app-title {
-        color: #333333; /* Dark text for light background */
-        font-size: 2.5em; /* Larger font size */
+        color: #333333; 
+        font-size: 2.8em; /* Slightly larger */
         font-weight: bold;
-        margin-bottom: 0.5rem; /* Reduced margin */
-        padding-top: 2rem; /* Spacing from top */
+        margin-bottom: 0.5rem; 
+        padding-top: 2.5rem; /* More spacing from top of page */
     }
     .sub-app-title {
-        color: #666666;
-        font-size: 1.2em;
-        margin-bottom: 2rem;
+        color: #555555; /* Darker grey for subtitle */
+        font-size: 1.3em; /* Slightly larger subtitle */
+        margin-bottom: 2.5rem; /* More spacing below subtitle */
     }
 
     /* Top-right logo container */
     .top-right-logo {
-        position: fixed; /* Fixed position relative to viewport */
-        top: 15px; /* Distance from top */
-        right: 15px; /* Distance from right */
-        z-index: 1000; /* Ensure it's on top of other elements */
-        background-color: rgba(255, 255, 255, 0.0); /* Transparent background */
+        position: fixed; 
+        top: 20px; /* Increased distance from top */
+        right: 20px; /* Increased distance from right */
+        z-index: 1000; 
+        background-color: rgba(255, 255, 255, 0.0); 
         padding: 5px;
         border-radius: 8px;
     }
     .top-right-logo img {
-        width: 80px; /* Adjust logo size as needed */
+        width: 100px; /* Slightly larger logo size */
         height: auto;
     }
 
-    /* Adjust padding for logged in pages, as they use sidebar and don't need central alignment on main page */
+    /* Adjust padding/alignment for logged in pages, overriding centering for content */
     .logged-in-main-content .st-emotion-cache-16txt4v {
-        align-items: flex-start; /* Reset to left align for general content */
-        padding-top: 2rem; /* Restore normal padding */
+        align-items: flex-start; 
+        padding-top: 2rem; 
         text-align: left;
+        margin-left: 1rem; /* Add some left margin for content when sidebar is present */
+        margin-right: 1rem; /* Add some right margin */
+        width: calc(100% - 2rem); /* Adjust width to fit margins */
     }
     .logged-in-main-content .st-emotion-cache-16txt4v .stForm {
-        width: auto; /* Reset form width */
+        width: auto; 
+        max-width: none; /* Remove max-width for forms in logged-in pages */
+    }
+    .logged-in-main-content h1, .logged-in-main-content h2, .logged-in-main-content h3 {
+        text-align: left; /* Ensure headings are left-aligned when logged in */
+        color: #333333;
     }
 
     /* Hide the default Streamlit hamburger menu button and Share button */
@@ -219,11 +240,11 @@ st.markdown(
 )
 
 # --- Inject Top-Right Logo HTML ---
-# This is placed globally, outside any conditional logic, to ensure it renders early.
+# IMPORTANT: Updated src path to point to 'app/static/logo.png'
 st.markdown(
     f"""
     <div class="top-right-logo">
-        <img src="app/static/logo.png" alt="Company Logo">
+        <img src="app/static/logo.png" alt="Company Logo" onerror="this.onerror=null; this.src='https://placehold.co/100x100/A0A0A0/FFFFFF?text=Logo+Missing';">
     </div>
     """,
     unsafe_allow_html=True
@@ -268,7 +289,7 @@ def initialize_firebase_app():
 
         st.session_state['db'] = firestore.client(app=firebase_app_instance) 
         st.session_state['bucket'] = storage.bucket(FIREBASE_STORAGE_BUCKET_NAME, app=firebase_app_instance) 
-        st.success("Firebase initialized successfully!")
+        # st.success("Firebase initialized successfully!") # COMMENTED OUT FOR CLEANER UI
         print("DEBUG: Firebase initialized successfully and clients stored in session state.")
         print(f"DEBUG: Session state 'db' is now: {type(st.session_state['db'])}")
         print(f"DEBUG: Session state 'bucket' is now: {type(st.session_state['bucket'])}")
@@ -424,7 +445,7 @@ def get_comparative_ai_analysis(jd_text, all_cv_data):
     }
 
     Ensure "Match %" is a string.
-    Ensure "Ranking" is a numerical rank string (e.g., "1", "2") without any emoji symbols (like 🥇, 🥈, 🥉).
+    Ensure "Ranking" is a numerical rank string (e.g., "1", "2") without any emoji symbols (like 🥇, 🥈, �).
     For "criteria_observations", dynamically create columns for each candidate using their names (e.g., "Gauri Deshmukh", "Himanshukulkarni"). Use ✅ for good fit, ❌ for not a fit, ⚠️ for partial fit.
     Make sure all text fields are within the string limits of JSON.
     The "Candidate Name" in "candidate_evaluations" and the dynamic column headers in "criteria_observations" should be derived from the provided filenames (e.g., "Gauri CV.pdf" -> "Gauri").
@@ -1441,24 +1462,28 @@ def main():
         st.markdown("<h1 class='main-app-title'>SSO Consultants AI Recruitment System</h1>", unsafe_allow_html=True)
         st.markdown("<p class='sub-app-title'>Streamlined Talent Acquisition with AI-Powered Insights</p>", unsafe_allow_html=True)
         
-        st.subheader("Choose Login Type")
-        
-        # Use columns to center the buttons
-        col_left_spacer, col_buttons, col_right_spacer = st.columns([1, 2, 1]) 
+        # Use columns to center the buttons and potentially the login form
+        col_left_spacer_buttons, col_buttons, col_right_spacer_buttons = st.columns([1, 2, 1]) 
         with col_buttons: # Buttons in the middle column
             admin_col, user_col = st.columns(2)
             with admin_col:
-                if st.button("Login as Admin", key="button_login_admin_main_page"): # Unique key for main page button
+                if st.button("Login as Admin", key="button_login_admin_main_page"): 
                     st.session_state['login_mode'] = 'admin'
                     st.session_state['current_page'] = 'Login' 
                     print("DEBUG (main): Admin login mode selected from main page.") 
                     st.rerun()
             with user_col:
-                if st.button("Login as User", key="button_login_user_main_page"): # Unique key for main page button
+                if st.button("Login as User", key="button_login_user_main_page"): 
                     st.session_state['login_mode'] = 'user'
                     st.session_state['current_page'] = 'Login' 
                     print("DEBUG (main): User login mode selected from main page.") 
                     st.rerun()
+        
+        # Display the 'Please select' message
+        col_left_spacer_info, col_info_center, col_right_spacer_info = st.columns([1, 2, 1])
+        with col_info_center:
+            if st.session_state['login_mode'] is None:
+                st.markdown("<p class='initial-info-message'>Please select 'Login as Admin' or 'Login as User' to proceed.</p>", unsafe_allow_html=True)
         
         # Only show login form if a mode has been selected
         if st.session_state['login_mode']:
@@ -1475,13 +1500,8 @@ def main():
                             login_user(email, password, login_as_admin_attempt=(st.session_state['login_mode'] == 'admin'))
                         else:
                             st.warning("Please enter both email and password.")
-        else: # If no login mode selected, prompt user (below buttons)
-            col_info_left, col_info_center, col_info_right = st.columns([1, 2, 1])
-            with col_info_center:
-                st.info("Please select 'Login as Admin' or 'Login as User' to proceed.")
 
     # --- Custom FOOTER (Always visible at the bottom of the page) ---
-    # Placed outside any main conditional logic to ensure it always renders at the very bottom
     st.markdown(
         """
         <div style="
@@ -1492,7 +1512,7 @@ def main():
             text-align: center;
             color: #666666; /* Adjust color for light theme */
             padding: 10px;
-            background-color: #f0f2f6; /* Match page background */
+            background-color: #F8F8F8; /* Match page background */
             font-size: 0.8em;
             border-top: 1px solid #e0e0e0; /* Subtle border */
             z-index: 999; /* Ensure it's above other content but below logo */
@@ -1506,3 +1526,4 @@ def main():
 # Entry point for the Streamlit application
 if __name__ == "__main__":
     main()
+�
