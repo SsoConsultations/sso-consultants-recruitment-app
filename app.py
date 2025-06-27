@@ -60,7 +60,7 @@ st.markdown(
 
     /* Specific targeting for ALL general text elements within the main Streamlit content area */
     /* This overrides any default Streamlit grey text */
-    /* Targeting p, label, Streamlit-generated markdown/text spans */
+    /* Targeting p, label, Streamlit-generated markdown/text spans, etc. */
     body p, body label, 
     .css-1d3f8gv p, .css-1d3f8gv label, 
     .logged-in-main-content p, .logged-in-main-content label,
@@ -73,41 +73,44 @@ st.markdown(
         color: #000000 !important; /* Force all general text, labels, and alert text to pure black */
     }
 
-    /* Customizing the sidebar - It will only appear when logged in */
+    /* Customizing the sidebar - Now light gray */
     .css-1lcbmhc { /* Sidebar container */
-        background-color: #212529; /* Dark sidebar background for strong contrast */
-        color: white; /* Default text in sidebar */
+        background-color: #F0F2F5; /* Very Light Gray sidebar background for subtle contrast */
+        color: #000000 !important; /* Default text in sidebar to black */
         padding-top: 2rem;
         padding-bottom: 2rem;
     }
-    .css-1lcbmhc .stRadio > label, /* Sidebar specific radio labels */
-    .css-1lcbmhc h1, .css-1lcbmhc h2, .css-1lcbmhc h3, .css-1lcbmhc h4, .css-1lcbmhc h5, .css-1lcbmhc h6, /* Sidebar headings */
-    .css-1lcbmhc p { /* Sidebar paragraphs */
-        color: white !important; /* Force all sidebar text to white/light grey */
+    /* Sidebar text elements - Force to black */
+    .css-1lcbmhc .stRadio > label, 
+    .css-1lcbmhc h1, .css-1lcbmhc h2, .css-1lcbmhc h3, .css-1lcbmhc h4, .css-1lcbmhc h5, .css-1lcbmhc h6, 
+    .css-1lcbmhc p { 
+        color: #000000 !important; /* Force all sidebar text to pure black */
     }
     .css-1lcbmhc .stButton > button {
         background-color: #0D47A1; /* Deep blue from logo for sidebar buttons */
-        color: white;
+        color: white; /* Sidebar button text stays white for contrast on blue */
         border-radius: 0.5rem;
         border: none;
         padding: 0.5rem 1rem;
     }
 
-    /* Styling for the main login buttons (Login as Admin, Login as User) */
-    .stButton > button {
-        background-color: #1976D2; /* Vibrant blue from logo for main action buttons */
-        color: white;
+    /* Styling for ALL buttons (st.button and st.form_submit_button) */
+    .stButton > button, 
+    .stForm button { /* Target buttons directly and buttons inside forms */
+        background-color: #1976D2 !important; /* Vibrant blue from logo - CRITICAL for all buttons */
+        color: white !important; /* Force button text to white - CRITICAL */
         border-radius: 0.5rem;
         padding: 0.75rem 1.5rem;
         font-size: 1.1rem;
         border: none;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         transition: all 0.3s ease;
-        margin: 0.75rem; /* Increased margin for better spacing */
+        margin: 0.75rem; /* Consistent margin */
         min-width: 180px; /* Ensure buttons have a consistent minimum width */
     }
-    .stButton > button:hover {
-        background-color: #0D47A1; /* Darker blue on hover */
+    .stButton > button:hover, 
+    .stForm button:hover {
+        background-color: #0D47A1 !important; /* Darker blue on hover - CRITICAL */
         transform: translateY(-2px);
     }
 
@@ -146,10 +149,10 @@ st.markdown(
         box-shadow: 0 0 0 0.2rem rgba(25, 118, 210, 0.25); 
     }
     
-    /* Styling for Radio Buttons (User/Admin under Assign Role) */
+    /* Styling for Radio Buttons (User/Admin under Assign Role AND Sidebar Navigation Radio Buttons) */
     /* Target the text itself inside the radio options */
     .stRadio div[data-testid="stRadio"] label span p {
-        color: #000000 !important; /* Pure black for 'User' and 'Admin' text - CRITICAL */
+        color: #000000 !important; /* Pure black for 'User', 'Admin', 'Dashboard' etc. text - CRITICAL */
     }
     /* Style the radio button circles (unselected) */
     .stRadio div[data-testid="stRadio"] input[type="radio"] + div::before {
@@ -195,6 +198,7 @@ st.markdown(
         color: #000000 !important; /* Pure black text - CRITICAL */
         border-color: #bee5eb;
     }
+
 
     /* Specific style for the initial info message on login page */
     .initial-info-message {
@@ -267,9 +271,10 @@ st.markdown(
         width: calc(100% - 2rem); 
     }
     /* Force all text elements within the main content area (after login) to be pure black */
+    /* This is a broad rule for safety */
     .logged-in-main-content p, 
-    .logged-in-main-content .stMarkdown, /* Ensure text inside markdown is black */
-    .logged-in-main-content .stText, /* Ensure text inside st.text is black */
+    .logged-in-main-content .stMarkdown, 
+    .logged-in-main-content .stText, 
     .logged-in-main-content .stInfo, 
     .logged-in-main-content .stWarning,
     .logged-in-main-content .stError,
@@ -281,8 +286,7 @@ st.markdown(
     .logged-in-main-content .stNumberInput,
     .logged-in-main-content .stTextArea,
     .logged-in-main-content .stProgress,
-    .logged-in-main-content .stDataFrame /* Adding more general text elements */
-     {
+    .logged-in-main-content .stDataFrame {
         color: #000000 !important; /* Pure black for all general text and labels - CRITICAL */
     }
     /* Ensure headings on logged-in pages are deep dark blue */
@@ -1466,13 +1470,13 @@ def main():
     if st.session_state['logged_in']:
         with st.sidebar:
             # Sidebar branding
-            st.title("SSO Consultants") 
-            st.subheader("AI Recruitment Dashboard") 
+            st.markdown("<h1 style='color: #000000 !important;'>SSO Consultants</h1>", unsafe_allow_html=True) # Forced black
+            st.markdown("<h2 style='color: #000000 !important;'>AI Recruitment Dashboard</h2>", unsafe_allow_html=True) # Forced black
             st.markdown("---") 
 
             st.write(f"Welcome, **{st.session_state['user_name']}**!")
             if st.session_state['is_admin']:
-                st.markdown("### Admin Privileges Active")
+                st.markdown("<h3 style='color: #000000 !important;'>Admin Privileges Active</h3>", unsafe_allow_html=True) # Forced black
             
             # Navigation for logged-in users (User & Admin)
             user_pages = ['Dashboard', 'Upload JD & CV'] 
