@@ -951,56 +951,16 @@ def upload_jd_cv_page():
         
         # --- START OF CHATGPT SUGGESTED CHANGE (Modified download button structure) ---
         # No more on_click for save_report_on_download here as it's called earlier
-if st.session_state['generated_docx_buffer']:
-    st.success("DOCX report generated successfully!")
-
-    # Define the filename for the cloud and local download
-    jd_filename_display = st.session_state.get('jd_filename_for_save', "Job Description")
-    cv_filenames_display = st.session_state.get('cv_filenames_for_save', ["Candidates"])
-    # Clean up filename for display/saving, ensure it's a string for .splitext
-    jd_base_name = os.path.splitext(jd_filename_display)[0] if isinstance(jd_filename_display, str) else "Job_Description"
-
-    report_filename_for_save = f"{jd_base_name}_Comparative_Report_{datetime.now().strftime('%Y%m%d')}.docx"
-
-    # Option 1: Combine Save to Cloud and Download in one button (less explicit)
-    # Sticking to your original prompt, where download happens, and the save should happen.
-    # The 'download_button' itself doesn't offer a callback for "after download complete".
-    # So, the best approach is to trigger the save when the report is GENERATED,
-    # and then the download button just offers the in-memory buffer.
-
-    # --- Call the save_report_on_download function here ---
-    # This will now save to Firebase *before* the local download is offered.
-    with st.spinner("Saving report to Firebase Cloud and preparing download..."):
-        gcs_uri, error_msg = save_report_on_download(
-            filename=report_filename_for_save,
-            docx_buffer=st.session_state['generated_docx_buffer'],
-            ai_result=st.session_state['ai_review_result'],
-            jd_original_name=st.session_state.get('jd_filename_for_save', 'N/A'),
-            cv_original_names=st.session_state.get('cv_filenames_for_save', ['N/A'])
-        )
-
-    if gcs_uri:
-        st.success(f"Report also saved to cloud! You can download it locally below.")
-        # You might even display the GCS URI here, or a link to it (if publicly accessible/signed URL generated)
-        # st.markdown(f"View on Cloud: [Link]({gcs_uri})") # This would be a GCS console link, not a direct download
-
-        # Local download button (your existing code, unchanged here)
-        st.download_button(
-            label="⬇️ Download AI Report (.docx)",
-            data=st.session_state['generated_docx_buffer'],
-            file_name=report_filename_for_save,
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            key='download_ai_report_button'
-        )
-    else:
-        st.error(f"Could not save report to cloud: {error_msg}. You can still download it locally.")
-        st.download_button(
-            label="⬇️ Download AI Report (.docx)",
-            data=st.session_state['generated_docx_buffer'],
-            file_name=report_filename_for_save,
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            key='download_ai_report_button'
-        )
+ if st.session_state['generated_docx_buffer']:
+            st.download_button(
+                label="Download DOCX Report ⬇️", # Label changed for clarity
+                data=st.session_state['generated_docx_buffer'],
+                file_name=download_filename, # Use the same filename generated for saving
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
+                key="download_docx_only" # New key for this button
+            )
+        else:
+            st.warning("Run an AI review to generate a report for download and save.")
         # --- END OF CHATGPT SUGGESTED CHANGE ---
 
 def save_report_on_download(filename, docx_buffer, ai_result, jd_original_name, cv_original_names):
