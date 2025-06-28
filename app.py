@@ -951,7 +951,7 @@ def upload_jd_cv_page():
         
         # --- START OF CHATGPT SUGGESTED CHANGE (Modified download button structure) ---
         # No more on_click for save_report_on_download here as it's called earlier
- if st.session_state['generated_docx_buffer']:
+        if st.session_state['generated_docx_buffer']:
             st.download_button(
                 label="Download DOCX Report ⬇️", # Label changed for clarity
                 data=st.session_state['generated_docx_buffer'],
