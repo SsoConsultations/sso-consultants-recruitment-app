@@ -697,57 +697,6 @@ def generate_docx_report(comparative_data, jd_filename="Job Description", cv_fil
         st.error(f"Error generating DOCX report: {e}")
         print(f"ERROR (generate_docx_report): {e}") 
         return None
-# --- Firebase Storage Upload Function ---
-def upload_report_to_firebase(buffer, filename, user_uid):
-    """
-    Uploads a BytesIO buffer (the DOCX report) to Firebase Storage.
-    Stores it under a user-specific path (e.g., 'user_uploads/{user_uid}/{filename}').
-    Returns the public URL of the uploaded file.
-    """
-    if not buffer or not filename or not user_uid:
-        st.error("Cannot upload report: Missing buffer, filename, or user UID.")
-        return None
-
-    try:
-        # Define the path in Firebase Storage
-        # This creates a structure like 'reports/{user_uid}/2025-06-28_JD_CV_Report.docx'
-        # Sanitize filename to remove special characters that might cause issues
-        safe_filename = re.sub(r'[^\w\s.-]', '', filename)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        upload_path = f"reports/{user_uid}/{timestamp}_{safe_filename}"
-        print(f"DEBUG (upload_report_to_firebase): Attempting to upload to: {upload_path}")
-
-        # Get a blob (file) reference
-        blob = bucket.blob(upload_path)
-
-        # Upload the buffer's content
-        buffer.seek(0) # IMPORTANT: Rewind the buffer to the beginning before uploading
-        blob.upload_from_file(buffer, content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-
-        # Make the blob public (optional, depending on your security model)
-        # If you don't make it public, you'll need signed URLs for access.
-        # For a recruitment report, you likely want restricted access,
-        # so this might be removed, and you'd generate a signed URL later.
-        # For now, we'll keep it simple to confirm upload works.
-        # blob.make_public() # Consider if you truly want publicly accessible reports
-
-        # Get the public URL (or a signed URL if not public)
-        # If not public, generate a signed URL with an expiration
-        # url = blob.generate_signed_url(datetime.timedelta(minutes=60)) # Valid for 60 mins
-        # For simplicity, if you want direct download via URL in the app, you'd make it public (not recommended for sensitive data)
-        # Or, fetch the URL after upload to store it in Firestore for later retrieval.
-        url = f"gs://{FIREBASE_STORAGE_BUCKET_NAME}/{upload_path}" # Google Cloud Storage URI
-        print(f"DEBUG (upload_report_to_firebase): Upload successful. GCS URI: {url}")
-        
-        # You might also want the direct download URL for the browser if made public:
-        # url = blob.public_url
-
-        return url
-
-    except Exception as e:
-        st.error(f"Error uploading report to Firebase Storage: {e}")
-        print(f"ERROR (upload_report_to_firebase): {e}")
-        return None
 
 # --- Firebase Authentication Functions ---
 def register_user(email, password, username):
