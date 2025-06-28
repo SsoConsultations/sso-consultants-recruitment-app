@@ -952,96 +952,131 @@ def upload_jd_cv_page():
         # --- START OF CHATGPT SUGGESTED CHANGE (Modified download button structure) ---
         # No more on_click for save_report_on_download here as it's called earlier
         if st.session_state['generated_docx_buffer']:
-            st.download_button(
-                label="Download DOCX Report ⬇️", # Label changed for clarity
-                data=st.session_state['generated_docx_buffer'],
-                file_name=download_filename, # Use the same filename generated for saving
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
-                key="download_docx_only" # New key for this button
-            )
-        else:
-            st.warning("Run an AI review to generate a report for download and save.")
+    st.success("DOCX report generated successfully!")
+
+    # Define the filename for the cloud and local download
+    jd_filename_display = st.session_state.get('jd_filename_for_save', "Job Description")
+    cv_filenames_display = st.session_state.get('cv_filenames_for_save', ["Candidates"])
+    # Clean up filename for display/saving, ensure it's a string for .splitext
+    jd_base_name = os.path.splitext(jd_filename_display)[0] if isinstance(jd_filename_display, str) else "Job_Description"
+
+    report_filename_for_save = f"{jd_base_name}_Comparative_Report_{datetime.now().strftime('%Y%m%d')}.docx"
+
+    # Option 1: Combine Save to Cloud and Download in one button (less explicit)
+    # Sticking to your original prompt, where download happens, and the save should happen.
+    # The 'download_button' itself doesn't offer a callback for "after download complete".
+    # So, the best approach is to trigger the save when the report is GENERATED,
+    # and then the download button just offers the in-memory buffer.
+
+    # --- Call the save_report_on_download function here ---
+    # This will now save to Firebase *before* the local download is offered.
+    with st.spinner("Saving report to Firebase Cloud and preparing download..."):
+        gcs_uri, error_msg = save_report_on_download(
+            filename=report_filename_for_save,
+            docx_buffer=st.session_state['generated_docx_buffer'],
+            ai_result=st.session_state['ai_review_result'],
+            jd_original_name=st.session_state.get('jd_filename_for_save', 'N/A'),
+            cv_original_names=st.session_state.get('cv_filenames_for_save', ['N/A'])
+        )
+
+    if gcs_uri:
+        st.success(f"Report also saved to cloud! You can download it locally below.")
+        # You might even display the GCS URI here, or a link to it (if publicly accessible/signed URL generated)
+        # st.markdown(f"View on Cloud: [Link]({gcs_uri})") # This would be a GCS console link, not a direct download
+
+        # Local download button (your existing code, unchanged here)
+        st.download_button(
+            label="⬇️ Download AI Report (.docx)",
+            data=st.session_state['generated_docx_buffer'],
+            file_name=report_filename_for_save,
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            key='download_ai_report_button'
+        )
+    else:
+        st.error(f"Could not save report to cloud: {error_msg}. You can still download it locally.")
+        st.download_button(
+            label="⬇️ Download AI Report (.docx)",
+            data=st.session_state['generated_docx_buffer'],
+            file_name=report_filename_for_save,
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            key='download_ai_report_button'
+        )
         # --- END OF CHATGPT SUGGESTED CHANGE ---
 
 def save_report_on_download(filename, docx_buffer, ai_result, jd_original_name, cv_original_names):
-    """Saves the report to Firebase Storage and Firestore metadata."""
-    st.info("Attempting to save report to cloud... (This message will disappear shortly)") 
-    print("DEBUG (save_report_on_download): Function started. User UID:", st.session_state.get('user_uid', 'N/A')) 
-    
-    if db is None or bucket is None:
-        st.error("Application error: Firebase clients (db or bucket) not available for saving.")
-        print("ERROR (save_report_on_download): Firebase clients are None. Cannot save report.")
-        return
+    """
+    Saves the generated DOCX report to Firebase Cloud Storage and potentially
+    saves metadata about the report to Firestore.
 
-    # Debug print to confirm the bucket name being used
-    print(f"DEBUG (save_report_on_download): Using bucket name: {FIREBASE_STORAGE_BUCKET_NAME}")
-    
-    storage_file_path = f"jd_cv_reports/{st.session_state['user_uid']}/{filename}"
-    download_url = None 
+    Args:
+        filename (str): The desired filename for the DOCX report (e.g., "AI_Report.docx").
+        docx_buffer (io.BytesIO): The BytesIO buffer containing the DOCX content.
+        ai_result (dict): The AI analysis result data (for Firestore metadata).
+        jd_original_name (str): Original filename of the Job Description.
+        cv_original_names (list): List of original filenames of the CVs.
+    """
+    if not st.session_state.get('user_uid'):
+        st.warning("User not logged in. Cannot save report to cloud storage.")
+        return None, "User not logged in."
+
+    user_uid = st.session_state['user_uid']
+    user_email = st.session_state.get('user_email', 'unknown@example.com') # Get email if available
+
+    if not docx_buffer or not filename:
+        st.error("Cannot save report: DOCX buffer or filename is missing.")
+        return None, "Missing DOCX buffer or filename."
+
+    # Ensure bucket and db are accessible (they should be in session_state)
+    if 'bucket' not in st.session_state or 'firestore_db' not in st.session_state:
+        st.error("Firebase Storage bucket or Firestore DB not initialized in session state.")
+        return None, "Firebase services not initialized."
+
+    bucket = st.session_state['bucket']
+    db = st.session_state['firestore_db']
+    firebase_storage_bucket_name = st.session_state['FIREBASE_STORAGE_BUCKET_NAME'] # Get the actual bucket name string
 
     try:
-        print(f"DEBUG (save_report_on_download): Attempting to upload file to Storage at: {storage_file_path}") 
-        # Create blob using the bucket object from session_state
-        blob = bucket.blob(storage_file_path) 
-        docx_buffer.seek(0) 
-        blob.upload_from_string(docx_buffer.getvalue(), content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-        
-        blob.make_public() 
-        download_url = blob.public_url
-        st.success(f"File uploaded to Firebase Storage successfully! URL: {download_url}") 
-        print(f"DEBUG (save_report_on_download): File uploaded to Storage. Public URL: {download_url}") 
+        # Sanitize filename for cloud storage paths
+        safe_filename = re.sub(r'[^\w\s\.-]', '', filename) # Allows alphanumeric, whitespace, dot, dash
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Example path: reports/{user_uid}/20250628_124500_AI_Report.docx
+        cloud_path = f"reports/{user_uid}/{timestamp}_{safe_filename}"
+        st.info(f"Preparing to upload report to: {cloud_path}")
 
-        report_metadata = {
-            "user_email": st.session_state['user_email'],
-            "user_name": st.session_state['user_name'],
-            "user_uid": st.session_state['user_uid'], 
-            "jd_filename": jd_original_name,
-            "cv_filenames": cv_original_names, 
-            "review_date": firestore.SERVER_TIMESTAMP, 
-            "review_date_human": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 
-            "outputDocFileName": filename,
-            "outputDocURL": download_url,
-            "summary": ai_result.get("final_shortlist_recommendation", "No summary provided.")
+        blob = bucket.blob(cloud_path)
+
+        # IMPORTANT: Rewind the buffer to the beginning before uploading
+        docx_buffer.seek(0)
+        blob.upload_from_file(docx_buffer, content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+
+        # Get the GCS URI of the uploaded file
+        gcs_uri = f"gs://{firebase_storage_bucket_name}/{cloud_path}"
+        st.success(f"Report uploaded to Firebase Storage: `{gcs_uri}`")
+
+        # --- Save metadata to Firestore (Highly Recommended) ---
+        report_data = {
+            'user_uid': user_uid,
+            'user_email': user_email,
+            'report_filename': filename, # The original filename provided
+            'cloud_path': cloud_path,    # The path where it's stored in GCS
+            'gcs_uri': gcs_uri,
+            'jd_original_name': jd_original_name,
+            'cv_original_names': cv_original_names,
+            'ai_review_summary': ai_result.get('summary', 'No summary available.'), # Example: store a short summary
+            'generated_at': firestore.SERVER_TIMESTAMP # Use server timestamp for consistency
         }
-        print(f"DEBUG (save_report_on_download): Prepared Firestore metadata: {report_metadata}") 
 
-        try:
-            # Adding debug print before Firestore save
-            print("DEBUG (save_report_on_download): About to attempt saving metadata to Firestore...")
-            db.collection('jd_cv_reports').add(report_metadata) 
-            st.success("Report metadata saved to Firestore successfully!") 
-            print("DEBUG (save_report_on_download): Report metadata successfully added to Firestore.") 
-        except exceptions.FirebaseError as firestore_e: 
-            st.error(f"Firestore save failed: {firestore_e}. Please check Firestore rules and quotas.")
-            print(f"ERROR (save_report_on_download): Firestore specific error: {firestore_e}") 
-            if download_url: 
-                try:
-                    blob.delete()
-                    print("DEBUG: Deleted file from Storage due to Firestore save failure.")
-                except Exception as e_del:
-                    print(f"ERROR: Failed to delete Storage file after Firestore error: {e_del}")
-        except Exception as generic_e: 
-            st.error(f"An unexpected error occurred during Firestore save: {generic_e}.")
-            print(f"ERROR (save_report_on_download): Generic error during Firestore save: {generic_e}") 
-            if download_url:
-                try:
-                    blob.delete()
-                    print(f"DEBUG: Deleted file from Storage due to generic Firestore save failure. Error during delete: {e_del}") 
-                except Exception as e_del:
-                    print(f"ERROR: Failed to delete Storage file after generic error: {e_del}")
+        # Add a new document to a 'user_reports' collection
+        reports_collection = db.collection('user_reports')
+        doc_ref = reports_collection.add(report_data)
+        st.info(f"Report metadata saved to Firestore with ID: {doc_ref[1].id}")
 
-    except Exception as e: 
-        st.error(f"Error during report upload or initial setup: {e}")
-        print(f"ERROR (save_report_on_download): Overall error in function (Storage upload or initial setup): {e}")
+        return gcs_uri, None # Return the URI and no error
 
-    finally:
-        # Note: These session state resets should ideally happen *after* the entire process including save.
-        # But since save_report_on_download is now called earlier, these might need re-evaluation
-        # based on desired UI behavior. For now, we leave them in the finally block of save_report_on_download.
-        # However, for clarity, it might be better to manage review_triggered in the calling function.
-        # Leaving as is for minimal change to save_report_on_download's existing finally.
-        pass # Removed direct resets here, as `review_triggered` is handled in `upload_jd_cv_page`
-
+    except Exception as e:
+        st.error(f"Error saving report to Firebase Cloud Storage: {e}")
+        return None, str(e)
+        
 def review_reports_page():
     """Displays a table of past reports fetched from Firestore for the current user."""
     st.markdown("<h1 style='color: #0D47A1 !important;'>📚 Review Your Past Reports</h1>", unsafe_allow_html=True)
