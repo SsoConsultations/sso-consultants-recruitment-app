@@ -951,7 +951,7 @@ def upload_jd_cv_page():
         
         # --- START OF CHATGPT SUGGESTED CHANGE (Modified download button structure) ---
         # No more on_click for save_report_on_download here as it's called earlier
-        if st.session_state['generated_docx_buffer']:
+if st.session_state['generated_docx_buffer']:
     st.success("DOCX report generated successfully!")
 
     # Define the filename for the cloud and local download
