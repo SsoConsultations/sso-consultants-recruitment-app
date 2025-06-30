@@ -180,7 +180,7 @@ st.markdown(
         text-decoration: none;
     }
     .report-table a:hover {
-        text-decoration: underline;
+        text_decoration: underline;
     }
     </style>
     """,
@@ -226,7 +226,7 @@ db = None
 bucket = None
 
 # Firebase Storage Bucket Name (this can remain hardcoded as it's not a secret itself, but derived from project)
-FIREBASE_STORAGE_BUCKET_NAME = 'ecr-app-drive-integration.appspot.com' 
+FIREBASE_STORAGE_BUCKET_NAME = 'smartrecruit-ai.appspot.com' # CHANGED: Ensure this matches your project's storage bucket if it's 'smartrecruit-ai'
 
 # --- Firebase Initialization Function (UPDATED) ---
 def initialize_firebase_app():
@@ -246,7 +246,7 @@ def initialize_firebase_app():
         required_secrets = [
             "firebase_admin_sdk_type",
             "firebase_admin_sdk_project_id",
-            "firebase_admin_sdk_private_key_id",
+            "firebase_admin_sdk_private_key_id", # This is explicitly checked
             "firebase_admin_sdk_private_key",
             "firebase_admin_sdk_client_email",
             "firebase_admin_sdk_client_id",
@@ -268,7 +268,7 @@ def initialize_firebase_app():
             "type": st.secrets["firebase_admin_sdk_type"],
             "project_id": st.secrets["firebase_admin_sdk_project_id"],
             "private_key_id": st.secrets["firebase_admin_sdk_private_key_id"],
-            "private_key": st.secrets["firebase_admin_sdk_private_key"],
+            "private_key": st.secrets["firebase_admin_sdk_private_key"].replace('\\n', '\n'), # Ensure newlines are correctly parsed
             "client_email": st.secrets["firebase_admin_sdk_client_email"],
             "client_id": st.secrets["firebase_admin_sdk_client_id"],
             "auth_uri": st.secrets["firebase_admin_sdk_auth_uri"],
@@ -315,9 +315,24 @@ except Exception as e:
 
 # --- Helper Function for AI Calling ---
 def call_openai_llm(prompt, model="gpt-4o", stream=False):
-    # This function remains unchanged as it's not directly related to Firebase init.
-    # Its content should be exactly as it was in your JDCV.txt.
-    pass
+    """
+    Calls the OpenAI LLM with the given prompt and model.
+    """
+    messages = [{"role": "user", "content": prompt}]
+    try:
+        response = openai_client.chat.completions.create(
+            model=model,
+            messages=messages,
+            stream=stream
+        )
+        if stream:
+            return response
+        else:
+            return response.choices[0].message.content
+    except Exception as e:
+        st.error(f"Error calling OpenAI LLM: {e}")
+        print(f"ERROR (call_openai_llm): {e}")
+        return None
 
 
 # --- Document Processing Functions ---
@@ -325,7 +340,7 @@ def call_openai_llm(prompt, model="gpt-4o", stream=False):
 def extract_text_from_pdf(uploaded_file_bytes_io):
     """Extracts text from a PDF file using PyPDF2."""
     try:
-        reader = PyPDF2.PdfReader(uploaded_file_bytes_io)
+        reader = PdfReader(uploaded_file_bytes_io)
         text = ""
         for page in reader.pages:
             text += page.extract_text() or ""
@@ -1464,7 +1479,7 @@ def main():
             if st.session_state['login_mode']:
                 st.markdown("---")
                 if st.session_state['current_page'] == 'Login':
-                    st.title(f"🔑 Login as {'Administrator' if st.session_state['login_mode'] == 'admin' else 'User'}</h3>", unsafe_allow_html=True)
+                    st.markdown(f"### 🔑 Login as {'Administrator' if st.session_state['login_mode'] == 'admin' else 'User'}", unsafe_allow_html=True)
                     with st.form("login_form"):
                         email = st.text_input("Email")
                         password = st.text_input("Password", type="password")
