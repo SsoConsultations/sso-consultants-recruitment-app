@@ -12,7 +12,7 @@ import firebase_admin
 from firebase_admin import credentials, auth, firestore, storage
 from firebase_admin import exceptions # Import exceptions module for FirebaseError
 import requests 
-# import base64 # REMOVED: No longer needed as we're not decoding a Base64 key
+import base64 # IMPORTANT: This import is necessary for decoding the Base64 key
 
 # --- AI & Document Processing Imports ---
 from openai import OpenAI
@@ -23,10 +23,9 @@ from docx.shared import Inches, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.section import WD_SECTION_START
 from docx.enum.table import WD_ALIGN_VERTICAL 
-from docx.oxml.ns import qn # Needed for horizontal line
-from docx.oxml import OxmlElement # Needed for horizontal line
 
 # --- Streamlit Page Configuration (MUST BE THE FIRST ST COMMAND) ---
+# Set layout to wide to allow custom centering without Streamlit's default narrow column
 st.set_page_config(
     page_title="SSO Consultants AI Recruitment",
     page_icon="🔍",
@@ -34,309 +33,414 @@ st.set_page_config(
 )
 
 # --- Custom CSS for Styling ---
-# Keeping your existing CSS unchanged for brevity in this immersive,
-# assuming it's already in your app.py.
+# This applies global styles to the Streamlit app to match the desired look.
 st.markdown(
     """
     <style>
     /* Global base styling - pure white background, pure black text by default */
     body {
         background-color: #FFFFFF; /* Pure white background */
-        color: #000000; /* Pure black text */
-        font-family: 'Inter', sans-serif; /* Use Inter font */
+        color: #000000 !important; /* Pure black for general text readability - CRITICAL */
+        font-family: 'Inter', sans-serif;
     }
-    /* Specific adjustments for Streamlit's main content area */
-    .stApp {
-        background-color: #FFFFFF; /* Ensure Streamlit's app background is white */
-        color: #000000; /* Ensure Streamlit's app text is black */
+
+    /* Hide Streamlit header and footer by default */
+    .stApp > header {
+        display: none;
     }
-    .stMarkdown, .stText, .stButton, .stTextInput, .stFileUploader, .stSelectbox, .stProgress, .stAlert {
-        color: #000000; /* Ensure all standard text is black */
+    .stApp > footer {
+        display: none; /* We will render our own custom footer */
     }
-    /* Header styling - orange background, white text */
-    header .stApp {
-        background-color: #FF671F; /* SSO Orange */
-        color: white;
-        padding: 10px;
-        border-bottom: 2px solid #E0E0E0; /* Subtle border for definition */
+
+    /* Main Streamlit app container and content blocks */
+    .stApp, .css-18e3th9, .css-1d3f8gv {
+        background-color: #FFFFFF; /* Ensure all main content areas are white */
+        color: #000000 !important; /* Force black text for main content areas */
     }
-    /* Centering the main content for a cleaner look */
-    .css-18e3th9 { /* Main container for app content */
-        padding-top: 2rem; /* Adjusted from 3rem */
-        padding-bottom: 2rem; /* Adjusted from 3rem */
-        padding-left: 5%; /* Keep some padding */
-        padding-right: 5%; /* Keep some padding */
-        max-width: 900px; /* Max width for readability */
-        margin: auto; /* Center the container */
+
+    /* Specific targeting for ALL general text elements within the main Streamlit content area */
+    /* This overrides any default Streamlit grey text */
+    /* Targeting p, label, Streamlit-generated markdown/text spans, etc. */
+    body p, body label, 
+    .css-1d3f8gv p, .css-1d3f8gv label, 
+    .logged-in-main-content p, .logged-in-main-content label,
+    .stMarkdown span, .stText span, /* Targeting spans inside st.markdown/st.text where content actually resides */
+    .stTextInput input[type="text"], .stTextInput input[type="password"], /* Input field text */
+    .stTextInput label, .stFileUploader label,
+    .stSelectbox label, .stRadio label,
+    .stCheckbox label, .stDateInput label, .stNumberInput label, .stTextArea label,
+    .stProgress, .stDataFrame {
+        color: #000000 !important; /* Force all general text, labels, and alert text to pure black */
     }
-    /* Style for buttons - modern, rounded, orange with hover effect */
-    .stButton>button {
-        background-color: #FF671F; /* Orange */
-        color: white;
-        border-radius: 8px;
+
+    /* Customizing the sidebar - Now forcing to light gray */
+    /* Targeting both the main sidebar container and its inner content area for robustness */
+    .css-1lcbmhc, /* Main sidebar container */
+    .css-1lcbmhc > section[data-testid="stSidebarContent"] { /* Inner content area */
+        background-color: #F0F2F5 !important; /* FORCING Very Light Gray sidebar background - CRITICAL */
+        color: #000000 !important; /* Default text in sidebar to black */
+    }
+    /* Sidebar text elements - Force to black now that background is light */
+    .css-1lcbmhc .stRadio > label, 
+    .css-1lcbmhc h1, .css-1lcbmhc h2, .css-1lcbmhc h3, .css-1lcbmhc h4, .css-1lcbmhc h5, .css-1lcbmhc h6, 
+    .css-1lcbmhc p,
+    .css-1lcbmhc .stMarkdown p, .css-1lcbmhc .stText p { /* Also target markdown/text within sidebar */
+        color: #000000 !important; /* Force all sidebar text to pure black - CRITICAL */
+    }
+    /* Sidebar buttons - keep text white for contrast on blue background */
+    .css-1lcbmhc .stButton > button {
+        background-color: #0D47A1; 
+        color: white; 
+        border-radius: 0.5rem;
         border: none;
-        padding: 10px 20px;
-        font-size: 16px;
+        padding: 0.5rem 1rem;
+    }
+
+    /* Styling for ALL buttons (st.button and st.form_submit_button) */
+    .stButton > button, 
+    .stForm button { /* Target buttons directly and buttons inside forms */
+        background-color: #1976D2 !important; /* Vibrant blue from logo - CRITICAL for all buttons */
+        color: white !important; /* Force button text to white - CRITICAL */
+        border-radius: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        font-size: 1.1rem;
+        border: none;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+        margin: 0.75rem; /* Consistent margin */
+        min-width: 180px; /* Ensure buttons have a consistent minimum width */
+    }
+    .stButton > button:hover, 
+    .stForm button:hover {
+        background-color: #0D47A1 !important; /* Darker blue on hover - CRITICAL */
+        transform: translateY(-2px);
+    }
+
+    /* Styling for forms and inputs */
+    .stForm {
+        padding: 2rem;
+        border-radius: 0.75rem;
+        background-color: #FFFFFF; /* White background for the form card */
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        margin-top: 2rem;
+        width: 100%; /* Ensure form takes full width of its column */
+        max-width: 500px; /* Limit form width for better appearance on large screens */
+    }
+    /* Labels within the form - explicitly pure black */
+    .stForm .stTextInput > label, 
+    .stForm .stSelectbox > label, 
+    .stForm .stRadio > label,
+    .stForm .stCheckbox > label {
         font-weight: bold;
-        cursor: pointer;
-        transition: background-color 0.3s, transform 0.2s;
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        color: #000000 !important; /* Pure black for labels on white form background - CRITICAL */
+        margin-bottom: 0.5rem;
     }
-    .stButton>button:hover {
-        background-color: #FF8C00; /* Lighter orange on hover */
-        transform: translateY(-2px); /* Slight lift effect */
+    /* Input fields (text typed by user) - explicitly pure black */
+    .stForm .stTextInput input[type="text"], 
+    .stForm .stTextInput input[type="password"] {
+        color: #000000 !important; /* Pure black text for input fields - CRITICAL */
+        background-color: #F8F8F8; /* Very light gray for input background */
+        border-radius: 0.5rem;
+        border: 1px solid #ced4da;
+        padding: 0.75rem 1rem;
+        width: 100%;
+        margin-bottom: 1rem;
     }
-    /* Style for text inputs and select boxes */
-    .stTextInput>div>div>input, .stFileUploader>div>div>button, .stSelectbox>div>div>select {
-        border-radius: 8px;
-        border: 1px solid #E0E0E0;
-        padding: 10px;
+    .stTextInput input:focus {
+        border-color: #1976D2; /* Focus color matching logo blue */
+        box-shadow: 0 0 0 0.2rem rgba(25, 118, 210, 0.25); 
     }
-    /* Specific styles for AI response sections */
-    .ai-response-container {
-        background-color: #f9f9f9; /* Light grey background for AI response */
-        border-left: 5px solid #4CAF50; /* Green left border */
-        padding: 15px;
-        margin-top: 20px;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    
+    /* Styling for Radio Buttons (User/Admin under Assign Role AND Sidebar Navigation Radio Buttons) */
+    /* Target the text itself inside the radio options */
+    .stRadio div[data-testid="stRadio"] label span p {
+        color: #000000 !important; /* Pure black for 'User', 'Admin', 'Dashboard' etc. text - CRITICAL */
     }
-    .ai-response-container h3 {
-        color: #333;
-        margin-top: 0;
+    /* Style the radio button circles (unselected) */
+    .stRadio div[data-testid="stRadio"] input[type="radio"] + div::before {
+        background-color: #FFFFFF !important; /* White background for unselected */
+        border: 2px solid #333333 !important; /* Dark border for unselected */
+        width: 18px !important; /* Consistent size */
+        height: 18px !important; /* Consistent size */
+        top: 3px !important; /* Adjust vertical alignment */
+        left: 0px !important; /* Adjust horizontal alignment */
     }
-    .ai-response-container p {
-        color: #555;
+    /* Style the radio button circles (selected dot) */
+    .stRadio div[data-testid="stRadio"] input[type="radio"]:checked + div::after {
+        background-color: #1976D2 !important; /* Vibrant Blue for selected dot - CRITICAL */
+        width: 10px !important; /* Size of the inner dot */
+        height: 10px !important; /* Size of the inner dot */
+        top: 7px !important; /* Adjust vertical alignment of dot */
+        left: 4px !important; /* Adjust horizontal alignment of dot */
     }
-    .stProgress > div > div > div > div {
-        background-color: #FF671F !important; /* Orange progress bar */
+
+    /* Success/Error/Warning/Info messages */
+    .stAlert {
+        border-radius: 0.5rem;
+        margin-top: 1rem;
+        margin-bottom: 1rem;
     }
-    /* Center the title */
-    .st-emotion-cache-10q7fgp { /* This targets the Streamlit title element's container */
-        text-align: center;
-        color: #FF671F; /* Orange color for the title */
+    .stAlert.success {
+        background-color: #d4edda; /* Light green */
+        color: #155724 !important; /* Dark green text - CRITICAL */
+        border-color: #c3e6cb;
     }
-    /* Center columns */
-    .st-emotion-cache-nahz7x { /* Center content inside columns, if used */
+    .stAlert.error {
+        background-color: #f8d7da; /* Light red */
+        color: #721c24 !important; /* Dark red text - CRITICAL */
+        border-color: #f5c6cb;
+    }
+    .stAlert.warning {
+        background-color: #fff3cd; /* Light yellow */
+        color: #856404 !important; /* Dark yellow text - CRITICAL */
+        border-color: #ffeeba;
+    }
+    .stAlert.info { /* Explicitly targeting info alerts */
+        background-color: #d1ecf1; /* Light blue info box background */
+        color: #000000 !important; /* Pure black text - CRITICAL */
+        border-color: #bee5eb;
+    }
+
+
+    /* Specific style for the initial info message on login page */
+    .initial-info-message {
+        font-size: 1.1em;
+        color: #000000 !important; /* Pure black for clear visibility - CRITICAL */
+        margin-top: 1.5rem; 
+        margin-bottom: 2rem;
+        font-style: italic;
+    }
+
+    /* Centering content within a column (applied to Streamlit's main block) */
+    .st-emotion-cache-16txt4v { 
         display: flex;
         flex-direction: column;
-        align-items: center;
-        justify-content: center;
+        align-items: center; /* Center horizontally */
+        justify-content: flex-start; /* Align from top vertically */
+        min-height: 90vh; /* Ensure content pushes footer down on shorter pages */
+        padding-top: 3.5rem; /* Adjusted padding from top for the main title */
     }
-    /* Adjust Streamlit's form styling */
-    .st-emotion-cache-13ln4jf { /* Target form container */
-        border: 1px solid #E0E0E0;
-        border-radius: 10px;
-        padding: 20px;
-        background-color: #fcfcfc;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    }
-    .st-emotion-cache-nahz7x { /* This is often the div for Streamlit columns */
-        width: 100%; /* Ensure columns take full width */
-        margin: auto; /* Attempt to center, though Streamlit's columns have their own layout */
-    }
-    /* Specific adjustments for file uploader area */
-    .stFileUploader {
-        border: 2px dashed #FF671F; /* Orange dashed border */
-        border-radius: 10px;
-        padding: 20px;
-        text-align: center;
-        background-color: #fffaf7; /* Light orange background */
-    }
-    .stFileUploader label {
+
+    /* Styling for the central main title */
+    .main-app-title {
+        color: #0D47A1 !important; /* Deep Dark Blue for main title - CRITICAL */
+        font-size: 2.8em; 
         font-weight: bold;
-        color: #FF671F;
+        margin-bottom: 0.5rem; 
+        text-align: center; /* Explicitly center align */
     }
-    .stFileUploader p {
-        color: #555;
+    .sub-app-title {
+        color: #0D47A1 !important; /* Deep Dark Blue for subtitle - CRITICAL */
+        font-size: 1.3em; 
+        margin-bottom: 2.5rem; 
+        text-align: center; /* Explicitly center align */
     }
-    .report-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 20px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+
+    /* Specific targeting for all h1, h2, h3, h4, h5, h6 tags */
+    h1, h2, h3, h4, h5, h6 {
+        color: #0D47A1 !important; /* Deep Dark Blue for all headings - CRITICAL */
+    }
+    /* Override for the login form h3 to be pure black as requested */
+    /* Target the specific generated Streamlit h3 elements for the login prompt */
+    .st-emotion-cache-nahz7x h3, .st-emotion-cache-nahz7x { 
+        color: #000000 !important; /* Pure black for the login mode title - CRITICAL */
+    }
+
+
+    /* Top-right logo container */
+    .top-right-logo {
+        position: fixed; 
+        top: 10px; 
+        right: 10px; 
+        z-index: 9999; 
+        background-color: rgba(255, 255, 255, 0.0); /* Transparent background */
+        padding: 5px;
         border-radius: 8px;
-        overflow: hidden; /* Ensures rounded corners are applied to content */
+        border: 2px solid red; /* *** DEBUGGING BORDER - RETAINED AS REQUESTED *** */
     }
-    .report-table th, .report-table td {
-        border: 1px solid #ddd;
-        padding: 12px 15px;
+    .top-right-logo img {
+        width: 100px; 
+        height: auto;
+    }
+
+    /* Adjust padding/alignment for logged in pages, overriding centering for content */
+    .logged-in-main-content .st-emotion-cache-16txt4v {
+        align-items: flex-start; /* Reset to left align */
+        padding-top: 2rem; 
         text-align: left;
+        margin-left: 1rem; 
+        margin-right: 1rem; 
+        width: calc(100% - 2rem); 
     }
-    .report-table th {
-        background-color: #FF671F;
-        color: white;
-        font-weight: bold;
-        text-transform: uppercase;
+    /* Force all text elements within the main content area (after login) to be pure black */
+    /* This is a broad rule for safety */
+    .logged-in-main-content p, 
+    .logged-in-main-content .stMarkdown, 
+    .logged-in-main-content .stText, 
+    .logged-in-main-content .stInfo, 
+    .logged-in-main-content .stWarning,
+    .logged-in-main-content .stError,
+    .logged-in-main-content label,
+    .logged-in-main-content .stSelectbox,
+    .logged-in-main-content .stRadio,
+    .logged-in-main-content .stCheckbox,
+    .logged-in-main-content .stDateInput,
+    .logged-in-main-content .stNumberInput,
+    .logged-in-main-content .stTextArea,
+    .logged-in-main-content .stProgress,
+    .logged-in-main-content .stDataFrame {
+        color: #000000 !important; /* Pure black for all general text and labels - CRITICAL */
     }
-    .report-table tr:nth-child(even) {
-        background-color: #f2f2f2;
+    /* Ensure headings on logged-in pages are deep dark blue */
+    .logged-in-main-content h1, 
+    .logged-in-main-content h2, 
+    .logged-in-main-content h3,
+    .logged-in-main-content h4,
+    .logged-in-main-content h5,
+    .logged-in-main-content h6 {
+        text-align: left; 
+        color: #0D47A1 !important; /* Deep Dark Blue for headings when logged in - CRITICAL */
     }
-    .report-table tr:hover {
-        background-color: #e0e0e0;
+    .logged-in-main-content .stForm {
+        width: auto; 
+        max-width: none; 
     }
-    .report-table a {
-        color: #007bff;
-        text-decoration: none;
+
+
+    /* Hide the default Streamlit hamburger menu button and Share button */
+    .css-hi6a2p { 
+        display: none !important;
     }
-    .report-table a:hover {
-        text_decoration: underline;
+    .css-1dp5x4b { 
+        display: none !important;
+    }
+    .css-1gh6j8x { 
+        display: none !important;
     }
     </style>
     """,
     unsafe_allow_html=True
 )
 
-# --- Streamlit Session State Initialization (Crucial for Streamlit) ---
-# These variables persist across Streamlit reruns, managing UI state and user data.
+# --- Inject Top-Right Logo HTML ---
+# IMPORTANT: Updated src path to use the raw GitHub URL for the logo.png file
+# This assumes your logo.png is at https://raw.githubusercontent.com/SsoConsultations/sso-consultants-recruitment-app/main/logo.png
+st.markdown(
+    f"""
+    <div class="top-right-logo">
+        <img src="https://raw.githubusercontent.com/SsoConsultations/sso-consultants-recruitment-app/main/logo.png" alt="Company Logo" onerror="this.onerror=null; this.src='https://placehold.co/100x100/A0A0A0/FFFFFF?text=Logo+Missing';">
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+# --- Configuration: NOW READING FROM STREAMLIT SECRETS ---
+# >>>>>>>>>>>>>>>>>>>>>>>>>> IMPORTANT: REPLACE THIS WITH YOUR NEW FIREBASE STORAGE BUCKET NAME <<<<<<<<<<<<<<<<<<<<<<<<<<<<
+# Example: 'your-new-project-id.appspot.com' or 'your-new-bucket-name.appspot.com'
+# You will get this from the Firebase Console -> Storage after creating a new bucket.
+FIREBASE_STORAGE_BUCKET_NAME = 'sso-recruitment-data.appspot.com' # <--- UPDATED TO THE NEW BUCKET!
+
+
+# --- Firebase Initialization Function ---
+def initialize_firebase_app():
+    """
+    Initializes the Firebase Admin SDK and stores client objects in session state.
+    This function is called only once per app run or when 'db' is not in session state.
+    """
+    print("DEBUG: Attempting to initialize Firebase app...")
+    try:
+        if "FIREBASE_SERVICE_ACCOUNT_KEY_BASE64" not in st.secrets:
+            print("ERROR: Firebase service account key (Base64) not found in Streamlit secrets.")
+            st.error("Firebase service account key (Base64) not found in Streamlit secrets. Please configure it in .streamlit/secrets.toml")
+            st.stop() 
+
+        firebase_service_account_key_base64_raw = st.secrets["FIREBASE_SERVICE_ACCOUNT_KEY_BASE64"].strip()
+        print(f"DEBUG: Fetched secret. Length: {len(firebase_service_account_key_base64_raw)} chars. Starts with: {firebase_service_account_key_base64_raw[:50]}")
+        
+        decoded_key_bytes = base64.urlsafe_b64decode(firebase_service_account_key_base64_raw.encode('utf-8'))
+        print("DEBUG: Decoded bytes parsed to JSON successfully.")
+        
+        FIREBASE_SERVICE_ACCOUNT_CONFIG = json.loads(decoded_key_bytes)
+        
+        cred = credentials.Certificate(FIREBASE_SERVICE_ACCOUNT_CONFIG)
+        print("DEBUG: Firebase credentials created.")
+        
+        if not firebase_admin._apps:
+            firebase_app_instance = firebase_admin.initialize_app(cred, {
+                'storageBucket': FIREBASE_STORAGE_BUCKET_NAME # Using the newly defined bucket name
+            })
+            print("DEBUG: Firebase app instance initialized.")
+        else:
+            firebase_app_instance = firebase_admin.get_app() 
+            print("DEBUG: Firebase app instance already initialized, reusing.")
+
+        st.session_state['db'] = firestore.client(app=firebase_app_instance) 
+        st.session_state['bucket'] = storage.bucket(FIREBASE_STORAGE_BUCKET_NAME, app=firebase_app_instance) # Using the newly defined bucket name
+        # st.success("Firebase initialized successfully!") # COMMENTED OUT FOR CLEANER UI
+        print("DEBUG: Firebase initialized successfully and clients stored in session state.")
+        print(f"DEBUG: Session state 'db' is now: {type(st.session_state['db'])}")
+        print(f"DEBUG: Session state 'bucket' is now: {type(st.session_state['bucket'])}")
+
+    except Exception as e:
+        print(f"ERROR: Error during Firebase initialization: {e}")
+        st.error(f"Error initializing Firebase: {e}.")
+        st.error("Please ensure your Streamlit secrets are correctly configured for Firebase. Specifically check 'FIREBASE_SERVICE_ACCOUNT_KEY_BASE64'.")
+        st.stop() 
+
+# --- Ensure Firebase is initialized and clients are available in session state ---
+if 'db' not in st.session_state or st.session_state['db'] is None:
+    print("DEBUG: 'db' not found in session state or is None. Calling initialize_firebase_app().")
+    initialize_firebase_app()
+else:
+    print("DEBUG: 'db' already exists in session state. Firebase previously initialized.")
+
+db = st.session_state['db']
+bucket = st.session_state['bucket']
+
+# --- Initialize OpenAI client ---
+try:
+    if "OPENAI_API_KEY" not in st.secrets:
+        st.error("OpenAI API key not found in Streamlit secrets. Please configure it in .streamlit/secrets.toml")
+        st.stop()
+    openai_client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+    print("DEBUG: OpenAI client initialized successfully.")
+except Exception as e:
+    st.error(f"OpenAI client not initialized: {e}. Please check your OPENAI_API_KEY in Streamlit secrets.")
+    print(f"ERROR: OpenAI client initialization failed: {e}") 
+    st.stop() 
+
+
+# --- Streamlit Session State Initialization ---
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 if 'user_name' not in st.session_state:
     st.session_state['user_name'] = ''
 if 'user_email' not in st.session_state:
     st.session_state['user_email'] = ''
-if 'user_uid' not in st.session_state: # Store user UID for Firestore security rules
+if 'user_uid' not in st.session_state: 
     st.session_state['user_uid'] = ''
-if 'is_admin' not in st.session_state: # Track admin status
+if 'is_admin' not in st.session_state: 
     st.session_state['is_admin'] = False
 if 'ai_review_result' not in st.session_state:
-    st.session_state['ai_review_result'] = None # Stores the full JSON from AI analysis
+    st.session_state['ai_review_result'] = None 
 if 'generated_docx_buffer' not in st.session_state:
-    st.session_state['generated_docx_buffer'] = None # Stores the BytesIO object for DOCX download
+    st.session_state['generated_docx_buffer'] = None 
 if 'review_triggered' not in st.session_state:
-    st.session_state['review_triggered'] = False # Flag to control display of AI results
+    st.session_state['review_triggered'] = False 
 if 'current_page' not in st.session_state:
-    st.session_state['current_page'] = 'Login' # Default to Login page if not set
-if 'jd_filename_for_save' not in st.session_state: # Session state for JD filename to use in save
+    st.session_state['current_page'] = 'Login' 
+if 'jd_filename_for_save' not in st.session_state: 
     st.session_state['jd_filename_for_save'] = "Job Description"
-if 'cv_filenames_for_save' not in st.session_state: # Session state for CV filenames to use in save
-    st.session_state['cv_filenames_for_save'] = [] # Store as a list
-if 'login_mode' not in st.session_state: # New: To distinguish Admin vs User login on the form
+if 'cv_filenames_for_save' not in st.session_state: 
+    st.session_state['cv_filenames_for_save'] = [] 
+if 'login_mode' not in st.session_state: 
     st.session_state['login_mode'] = None
-# New session state variables for first-time password update
 if 'new_user_email_for_pw_reset' not in st.session_state:
     st.session_state['new_user_email_for_pw_reset'] = ''
 if 'new_user_uid_for_pw_reset' not in st.session_state:
     st.session_state['new_user_uid_for_pw_reset'] = ''
 
-# --- GLOBAL FIREBASE INSTANCES (Initialized once) ---
-# Global variables to store Firebase app, Firestore, and Storage clients
-firebase_app = None
-db = None
-bucket = None
-
-# Firebase Storage Bucket Name (this can remain hardcoded as it's not a secret itself, but derived from project)
-FIREBASE_STORAGE_BUCKET_NAME = 'smartrecruit-ai.appspot.com' # CHANGED: Ensure this matches your project's storage bucket if it's 'smartrecruit-ai'
-
-# --- Firebase Initialization Function (UPDATED) ---
-def initialize_firebase_app():
-    """
-    Initializes the Firebase Admin SDK if not already initialized.
-    Now reads individual service account key fields from st.secrets.
-    """
-    global firebase_app, db, bucket
-    
-    if firebase_app is not None:
-        print("DEBUG (Firebase Init): Firebase app already initialized.")
-        return
-
-    print("DEBUG (Firebase Init): Attempting to initialize Firebase app...")
-    try:
-        # Check for all required individual service account key fields
-        required_secrets = [
-            "firebase_admin_sdk_type",
-            "firebase_admin_sdk_project_id",
-            "firebase_admin_sdk_private_key_id", # This is explicitly checked
-            "firebase_admin_sdk_private_key",
-            "firebase_admin_sdk_client_email",
-            "firebase_admin_sdk_client_id",
-            "firebase_admin_sdk_auth_uri",
-            "firebase_admin_sdk_token_uri",
-            "firebase_admin_sdk_auth_provider_x509_cert_url",
-            "firebase_admin_sdk_client_x509_cert_url",
-            "firebase_admin_sdk_universe_domain"
-        ]
-
-        missing_secrets = [s for s in required_secrets if s not in st.secrets]
-        if missing_secrets:
-            st.error(f"Missing Firebase Admin SDK secrets in Streamlit: {', '.join(missing_secrets)}. Please configure them in .streamlit/secrets.toml")
-            print(f"ERROR (Firebase Init): Missing secrets: {missing_secrets}")
-            st.stop()
-            
-        # Construct the credentials dictionary from individual secrets
-        firebase_service_account_config = {
-            "type": st.secrets["firebase_admin_sdk_type"],
-            "project_id": st.secrets["firebase_admin_sdk_project_id"],
-            "private_key_id": st.secrets["firebase_admin_sdk_private_key_id"],
-            "private_key": st.secrets["firebase_admin_sdk_private_key"].replace('\\n', '\n'), # Ensure newlines are correctly parsed
-            "client_email": st.secrets["firebase_admin_sdk_client_email"],
-            "client_id": st.secrets["firebase_admin_sdk_client_id"],
-            "auth_uri": st.secrets["firebase_admin_sdk_auth_uri"],
-            "token_uri": st.secrets["firebase_admin_sdk_token_uri"],
-            "auth_provider_x509_cert_url": st.secrets["firebase_admin_sdk_auth_provider_x509_cert_url"],
-            "client_x509_cert_url": st.secrets["firebase_admin_sdk_client_x509_cert_url"],
-            "universe_domain": st.secrets["firebase_admin_sdk_universe_domain"],
-        }
-        print("DEBUG (Firebase Init): Firebase service account config loaded from secrets.")
-
-        # Initialize the app with credentials
-        cred = credentials.Certificate(firebase_service_account_config)
-        firebase_app = firebase_admin.initialize_app(cred, {
-            'storageBucket': FIREBASE_STORAGE_BUCKET_NAME # Essential for Storage
-        })
-        
-        db = firestore.client(app=firebase_app)
-        bucket = storage.bucket(FIREBASE_STORAGE_BUCKET_NAME, app=firebase_app)
-        
-        st.session_state['firestore_db'] = db # Store in session state for access
-        st.session_state['bucket'] = bucket # Store in session state for access
-        
-        print("DEBUG (Firebase Init): Firebase app, Firestore, and Storage clients initialized.")
-        st.info("Firebase services initialized successfully!")
-
-    except Exception as e:
-        st.error(f"Error initializing Firebase services: {e}")
-        print(f"ERROR (Firebase Init): Initialization failed - {e}")
-        st.stop()
-
-# Initialize OpenAI client
-try:
-    # Check if OpenAI API Key is available in Streamlit secrets
-    if "OPENAI_API_KEY" not in st.secrets:
-        st.error("OpenAI API key not found in Streamlit secrets. Please configure it in .streamlit/secrets.toml")
-        st.stop()
-    # Initialize the OpenAI client using the API key from secrets
-    openai_client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-except Exception as e:
-    st.error(f"OpenAI client not initialized: {e}. Please check your OPENAI_API_KEY in Streamlit secrets.")
-    print(f"ERROR: OpenAI client initialization failed: {e}") # Terminal print for debugging
-    st.stop() # Stop the app if OpenAI fails to initialize
-
-
-# --- Helper Function for AI Calling ---
-def call_openai_llm(prompt, model="gpt-4o", stream=False):
-    """
-    Calls the OpenAI LLM with the given prompt and model.
-    """
-    messages = [{"role": "user", "content": prompt}]
-    try:
-        response = openai_client.chat.completions.create(
-            model=model,
-            messages=messages,
-            stream=stream
-        )
-        if stream:
-            return response
-        else:
-            return response.choices[0].message.content
-    except Exception as e:
-        st.error(f"Error calling OpenAI LLM: {e}")
-        print(f"ERROR (call_openai_llm): {e}")
-        return None
-
-
-# --- Document Processing Functions ---
-
+# --- Helper Functions for Text Extraction ---
 def extract_text_from_pdf(uploaded_file_bytes_io):
     """Extracts text from a PDF file using PyPDF2."""
     try:
@@ -347,7 +451,7 @@ def extract_text_from_pdf(uploaded_file_bytes_io):
         return text
     except Exception as e:
         st.error(f"Error extracting text from PDF: {e}")
-        print(f"ERROR (extract_text_from_pdf): {e}")
+        print(f"ERROR (extract_text_from_pdf): {e}") 
         return None
 
 def extract_text_from_docx(uploaded_file_bytes_io):
@@ -360,7 +464,7 @@ def extract_text_from_docx(uploaded_file_bytes_io):
         return text
     except Exception as e:
         st.error(f"Error extracting text from DOCX: {e}")
-        print(f"ERROR (extract_text_from_docx): {e}")
+        print(f"ERROR (extract_text_from_docx): {e}") 
         return None
 
 def get_file_content(uploaded_file_bytes_io, filename):
@@ -372,28 +476,11 @@ def get_file_content(uploaded_file_bytes_io, filename):
     elif file_extension == '.docx':
         return extract_text_from_docx(uploaded_file_bytes_io)
     elif file_extension == '.txt':
-        uploaded_file_bytes_io.seek(0) # Ensure buffer is at the beginning
         return uploaded_file_bytes_io.read().decode('utf-8')
     else:
         st.error(f"Unsupported file type: {file_extension}. Only PDF, DOCX, TXT are supported.")
-        print(f"ERROR (get_file_content): Unsupported file type {file_extension} for {filename}")
+        print(f"ERROR (get_file_content): Unsupported file type {file_extension} for {filename}") 
         return None
-
-# --- NEW: Function to create a horizontal line (from ethics review, good for reports) ---
-def add_hr_to_document(doc):
-    """Adds a horizontal line to the document."""
-    paragraph = doc.add_paragraph()
-    p_element = paragraph._p
-    pPr = p_element.get_or_add_pPr()
-    pBdr = OxmlElement('w:pBdr')
-    pPr.append(pBdr)
-    bottom = OxmlElement('w:bottom')
-    bottom.set(qn('w:val'), 'single')
-    bottom.set(qn('w:sz'), '6')
-    bottom.set(qn('w:space'), '1')
-    bottom.set(qn('w:color'), 'auto')
-    pBdr.append(bottom)
-
 
 # --- AI Function: Comparative Analysis ---
 def get_comparative_ai_analysis(jd_text, all_cv_data):
@@ -404,7 +491,7 @@ def get_comparative_ai_analysis(jd_text, all_cv_data):
     shortlist recommendation.
     """
     if not jd_text or not all_cv_data:
-        print("DEBUG (get_comparative_ai_analysis): Missing JD or CV data.")
+        print("DEBUG (get_comparative_ai_analysis): Missing JD or CV data.") 
         return {"error": "Missing Job Description or Candidate CV content for comparative analysis."}
 
     # System prompt defines the AI's role and the required JSON output format
@@ -419,7 +506,7 @@ def get_comparative_ai_analysis(jd_text, all_cv_data):
           "Match %": "...",              // Numerical percentage as a string (e.g., "85%")
           "Ranking": "...",              // E.g., "1", "2", "3", etc. (NO MEDALS)
           "Shortlist Probability": "...",// E.g., "High", "Moderate", "Low"
-          "Key Strengths": "...",        // Concise points, comma-separated or short phrase. Highlight relevant experience.
+          "Key Strengths": "...",        // Concise points, comma-separated or short phrase. Highlight relevant relevant experience.
           "Key Gaps": "...",             // Concise points, comma-separated or short phrase.
           "Location Suitability": "...", // E.g., "Pune", "Delhi (flexible)", "Remote", "Not Specified"
           "Comments": "..."              // Any other relevant observation for this candidate, including fit for Indian context.
@@ -470,38 +557,36 @@ def get_comparative_ai_analysis(jd_text, all_cv_data):
 
     try:
         with st.spinner("AI is analyzing the JD and CVs... This may take a moment."):
-            print("DEBUG (get_comparative_ai_analysis): Sending request to OpenAI API.")
+            print("DEBUG (get_comparative_ai_analysis): Sending request to OpenAI API.") 
             response = openai_client.chat.completions.create(
-                model="gpt-4o-mini", # Using gpt-4o-mini for cost-effectiveness and speed
+                model="gpt-4o-mini", 
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=0.2, # Lower temperature for more deterministic and factual responses
-                response_format={"type": "json_object"} # Ensure JSON output
+                temperature=0.2, 
+                response_format={"type": "json_object"} 
             )
         ai_response_content = response.choices[0].message.content
-        print(f"DEBUG (get_comparative_ai_analysis): Raw AI Response: {ai_response_content[:200]}...")
+        print(f"DEBUG (get_comparative_ai_analysis): Raw AI Response: {ai_response_content[:200]}...") 
         comparative_data = json.loads(ai_response_content)
         
-        # --- Post-processing: Remove medals from Ranking ---
         if "candidate_evaluations" in comparative_data:
             for candidate in comparative_data["candidate_evaluations"]:
                 if "Ranking" in candidate and isinstance(candidate["Ranking"], str):
-                    # Remove common medal emojis (U+1F3C5 to U+1F3CA and U+1F947 to U+1F949)
                     candidate["Ranking"] = re.sub(r'[\U0001F3C5-\U0001F3CA\U0001F947-\U0001F949]', '', candidate["Ranking"]).strip()
 
-        print("DEBUG (get_comparative_ai_analysis): AI analysis successful.")
+        print("DEBUG (get_comparative_ai_analysis): AI analysis successful.") 
         return comparative_data
 
     except json.JSONDecodeError as e:
         st.error(f"Error: AI response was not valid JSON. Please try again or refine input. Error: {e}")
-        st.code(ai_response_content)
-        print(f"ERROR (get_comparative_ai_analysis): JSON Decode Error: {e}, Response: {ai_response_content}")
+        st.code(ai_response_content) 
+        print(f"ERROR (get_comparative_ai_analysis): JSON Decode Error: {e}, Response: {ai_response_content}") 
         return {"error": f"AI response format error: {e}"}
     except Exception as e:
         st.error(f"An unexpected error occurred during AI analysis: {e}")
-        print(f"ERROR (get_comparative_ai_analysis): Unexpected Error during AI analysis: {e}")
+        print(f"ERROR (get_comparative_ai_analysis): Unexpected Error during AI analysis: {e}") 
         return {"error": f"AI processing failed: {e}"}
 
 # --- DOCX Generation Function ---
@@ -513,7 +598,6 @@ def generate_docx_report(comparative_data, jd_filename="Job Description", cv_fil
     try:
         document = Document()
 
-        # Set document properties for better appearance (margins, font, etc.)
         section = document.sections[0]
         section.start_type = WD_SECTION_START.NEW_PAGE
         section.left_margin = Inches(1)
@@ -521,145 +605,121 @@ def generate_docx_report(comparative_data, jd_filename="Job Description", cv_fil
         section.top_margin = Inches(1)
         section.bottom_margin = Inches(1)
 
-        # Title and Metadata
         document.add_heading("JD-CV Comparative Analysis Report", level=0)
         document.add_paragraph().add_run("Generated by SSO Consultants AI").italic = True
         document.add_paragraph().add_run(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}").small_caps = True
         document.add_paragraph(f"Job Description: {jd_filename}\nCandidates: {cv_filenames_str}")
-        document.add_paragraph("\n") # Add some space
+        document.add_paragraph("\n") 
 
-        # Extract data from AI response for easier access
         candidate_evaluations_data = comparative_data.get("candidate_evaluations", [])
         criteria_observations_data = comparative_data.get("criteria_observations", [])
         additional_observations_text = comparative_data.get("additional_observations_text", "No general observations provided.")
         final_shortlist_recommendation = comparative_data.get("final_shortlist_recommendation", "No final recommendation provided.")
 
-        # --- Candidate Evaluation Table ---
         if candidate_evaluations_data:
             document.add_heading("🧾 Candidate Evaluation Table", level=1)
             document.add_paragraph("Detailed assessment of each candidate against the Job Description:")
 
             df_evaluations = pd.DataFrame(candidate_evaluations_data)
 
-            # Define expected columns and ensure they exist, adding 'N/A' if missing
             expected_cols_eval = ["Candidate Name", "Match %", "Ranking", "Shortlist Probability", "Key Strengths", "Key Gaps", "Location Suitability", "Comments"]
             for col in expected_cols_eval:
                 if col not in df_evaluations.columns:
                     df_evaluations[col] = "N/A"
-            # Reorder columns as desired
             df_evaluations = df_evaluations[expected_cols_eval]
 
-            # Add table to the document
             table_eval = document.add_table(rows=1, cols=len(df_evaluations.columns))
-            table_eval.style = 'Table Grid' # Apply a default table style
+            table_eval.style = 'Table Grid' 
 
-            # Add table headers (first row)
             hdr_cells_eval = table_eval.rows[0].cells
             for i, col_name in enumerate(df_evaluations.columns):
                 hdr_cells_eval[i].text = col_name
-                # Format header text
                 for paragraph in hdr_cells_eval[i].paragraphs:
                     for run in paragraph.runs:
                         run.bold = True
-                        run.font.size = Pt(9) # Smaller font for headers for better fit
+                        run.font.size = Pt(9) 
                 hdr_cells_eval[i].vertical_alignment = WD_ALIGN_VERTICAL.CENTER
 
-            # Add data rows
             for index, row in df_evaluations.iterrows():
                 row_cells = table_eval.add_row().cells
                 for i, cell_value in enumerate(row):
                     row_cells[i].text = str(cell_value)
-                    # Format body text
                     for paragraph in row_cells[i].paragraphs:
                         for run in paragraph.runs:
-                            run.font.size = Pt(9) # Smaller font for body for better fit
+                            run.font.size = Pt(9) 
 
-            document.add_paragraph("\n") # Add spacing after table
+            document.add_paragraph("\n") 
 
-        # --- Additional Observations (Criteria Comparison) Table ---
         if criteria_observations_data:
             document.add_heading("✅ Additional Observations (Criteria Comparison)", level=1)
             
             df_criteria = pd.DataFrame(criteria_observations_data)
 
             table_criteria = document.add_table(rows=1, cols=len(df_criteria.columns))
-            table_criteria.style = 'Table Grid' # Apply a default table style
+            table_criteria.style = 'Table Grid' 
 
-            # Add table headers (first row)
             hdr_cells_criteria = table_criteria.rows[0].cells
             for i, col_name in enumerate(df_criteria.columns):
                 hdr_cells_criteria[i].text = col_name
-                # Format header text
                 for paragraph in hdr_cells_criteria[i].paragraphs:
                     for run in paragraph.runs:
                         run.bold = True
                         run.font.size = Pt(9)
                 hdr_cells_criteria[i].vertical_alignment = WD_ALIGN_VERTICAL.CENTER
 
-            # Add data rows
             for index, row in df_criteria.iterrows():
                 row_cells = table_criteria.add_row().cells
                 for i, cell_value in enumerate(row):
                     row_cells[i].text = str(cell_value)
-                    # Format body text
                     for paragraph in row_cells[i].paragraphs:
                         for run in paragraph.runs:
                             run.font.size = Pt(9)
 
-            document.add_paragraph("\n") # Add spacing after table
+            document.add_paragraph("\n") 
 
-        # --- General Additional Observations Text ---
-        # Check if text is present and not just the default or empty
         if additional_observations_text and additional_observations_text.strip() not in ["No general observations provided.", ""]:
             document.add_heading("General Observations", level=2)
             document.add_paragraph(additional_observations_text)
             document.add_paragraph("\n")
 
-        # --- Final Shortlist Recommendation ---
-        # Check if text is present and not just the default or empty
         if final_shortlist_recommendation and final_shortlist_recommendation.strip() not in ["No final recommendation provided.", ""]:
             document.add_heading("📌 Final Shortlist Recommendation", level=1)
             final_rec_para = document.add_paragraph()
-            final_rec_para.add_run(final_shortlist_recommendation).bold = True # Make recommendation bold
+            final_rec_para.add_run(final_shortlist_recommendation).bold = True 
             document.add_paragraph("\n")
 
-        # Save the document to a BytesIO object
         doc_io = io.BytesIO()
         document.save(doc_io)
-        doc_io.seek(0) # Rewind the buffer to the beginning
-        print("DEBUG (generate_docx_report): DOCX generated successfully.")
+        doc_io.seek(0) 
+        print("DEBUG (generate_docx_report): DOCX generated successfully.") 
         return doc_io
     except Exception as e:
         st.error(f"Error generating DOCX report: {e}")
-        print(f"ERROR (generate_docx_report): {e}")
+        print(f"ERROR (generate_docx_report): {e}") 
         return None
 
 # --- Firebase Authentication Functions ---
-
 def register_user(email, password, username):
     """Registers a new user in Firebase Authentication and stores user profile in Firestore."""
     try:
-        print(f"DEBUG (register_user): Attempting to create user {email}")
-        # Create user in Firebase Auth
+        print(f"DEBUG (register_user): Attempting to create user {email}") 
         user = auth.create_user(email=email, password=password, display_name=username)
         
-        # Store additional user info in Firestore
-        st.session_state['db'].collection('users').document(user.uid).set({
+        db.collection('users').document(user.uid).set({ 
             'email': email,
             'username': username,
             'created_at': firestore.SERVER_TIMESTAMP,
-            'isAdmin': False, # New users are NOT admins by default
-            'firstLoginRequired': True # New users must change password on first login
+            'isAdmin': False, 
+            'firstLoginRequired': True 
         })
         st.success(f"Account created successfully for {username}! Please log in.")
-        print(f"DEBUG (register_user): User {username} created and profile saved.")
-        time.sleep(2)
+        print(f"DEBUG (register_user): User {username} created and profile saved.") 
+        time.sleep(2) 
         return True
     except Exception as e:
         st.error(f"Error creating account: {e}")
-        print(f"ERROR (register_user): {e}")
-        time.sleep(2)
-        # Specific error handling for Firebase Auth
+        print(f"ERROR (register_user): {e}") 
+        time.sleep(2) 
         if "EMAIL_EXISTS" in str(e):
             st.error("This email is already registered.")
         return False
@@ -668,60 +728,65 @@ def login_user(email, password, login_as_admin_attempt=False):
     """Logs in a user by verifying their existence in Firebase Auth using Admin SDK.
     Also fetches user's admin status from Firestore and enforces login type.
     Redirects to password update if first login is required."""
+    
+    if db is None:
+        print("ERROR: login_user called but 'db' is None. Firebase initialization failed or was not completed.")
+        st.error("Application error: Database connection not established. Please refresh or contact support.")
+        return False
+
     try:
-        print(f"DEBUG (login_user): Attempting to log in {email}")
+        print(f"DEBUG (login_user): Attempting to log in {email}") 
         user = auth.get_user_by_email(email)
-        user_doc_ref = st.session_state['db'].collection('users').document(user.uid)
+        user_doc_ref = db.collection('users').document(user.uid) 
         user_doc = user_doc_ref.get()
 
         if user_doc.exists:
             user_data = user_doc.to_dict()
             is_user_admin_in_db = user_data.get('isAdmin', False)
-            first_login_required = user_data.get('firstLoginRequired', True) # Default to True if field missing
-            print(f"DEBUG (login_user): User {email} data: isAdmin={is_user_admin_in_db}, firstLoginRequired={first_login_required}")
+            first_login_required = user_data.get('firstLoginRequired', True) 
+            print(f"DEBUG (login_user): User {email} data: isAdmin={is_user_admin_in_db}, firstLoginRequired={first_login_required}") 
 
-            # Enforce login type:
             if login_as_admin_attempt and not is_user_admin_in_db:
                 st.error("This account does not have administrator privileges. Please log in as a regular user.")
-                print(f"DEBUG (login_user): Admin login attempt for non-admin user {email} denied.")
-                return
+                print(f"DEBUG (login_user): Admin login attempt for non-admin user {email} denied.") 
+                return False 
             elif not login_as_admin_attempt and is_user_admin_in_db:
                 st.error("This account has administrator privileges. Please log in as an administrator.")
-                print(f"DEBUG (login_user): User login attempt for admin user {email} denied.")
-                return
+                print(f"DEBUG (login_user): User login attempt for admin user {email} denied.") 
+                return False 
             
-            # If first login is required, redirect to password update page
             if first_login_required:
-                st.session_state['new_user_email_for_pw_reset'] = email
-                st.session_state['new_user_uid_for_pw_reset'] = user.uid
+                st.session_state['new_user_email_for_pw_reset'] = email 
+                st.session_state['new_user_uid_for_pw_reset'] = user.uid 
                 st.session_state['current_page'] = 'Update Password'
                 st.success("Please update your password before proceeding.")
-                print(f"DEBUG (login_user): Redirecting {email} to password update page.")
+                print(f"DEBUG (login_user): Redirecting {email} to password update page.") 
                 time.sleep(1)
                 st.rerun()
-                return
+                return True 
 
-            # Proceed with normal login if first login is not required
             st.session_state['logged_in'] = True
             st.session_state['user_email'] = email
             st.session_state['user_name'] = user_data.get('username', email.split('@')[0])
-            st.session_state['user_uid'] = user.uid
-            st.session_state['is_admin'] = is_user_admin_in_db
+            st.session_state['user_uid'] = user.uid 
+            st.session_state['is_admin'] = is_user_admin_in_db 
 
             st.success(f"Logged in as {st.session_state['user_name']}.")
             if st.session_state['is_admin']:
                 st.info("You are logged in as an administrator.")
-            print(f"DEBUG (login_user): Successfully logged in {st.session_state['user_name']} (UID: {st.session_state['user_uid']}, Admin: {st.session_state['is_admin']}).")
+            print(f"DEBUG (login_user): Successfully logged in {st.session_state['user_name']} (UID: {st.session_state['user_uid']}, Admin: {st.session_state['is_admin']}).") 
             
-            time.sleep(1)
-            st.session_state['current_page'] = 'Dashboard'
+            time.sleep(1) 
+            st.session_state['current_page'] = 'Dashboard' 
             st.rerun() 
+            return True 
         else:
             st.error("User profile not found in Firestore. Please ensure your account is set up correctly.")
-            print(f"ERROR (login_user): User profile for {email} not found in Firestore.")
+            print(f"ERROR (login_user): User profile for {email} not found in Firestore.") 
+            return False
     except exceptions.FirebaseError as e: 
         st.error(f"Login failed: {e}")
-        print(f"ERROR (login_user): Firebase Error during login for {email}: {e}")
+        print(f"ERROR (login_user): Firebase Error during login for {email}: {e}") 
         time.sleep(2)
         if "user-not-found" in str(e):
             st.error("Invalid email. Please check your email or sign up.")
@@ -729,56 +794,54 @@ def login_user(email, password, login_as_admin_attempt=False):
             st.error("Invalid email format.")
         else:
             st.error(f"An authentication error occurred: {e}. Please try again.")
+        return False
     except Exception as e:
         st.error(f"An unexpected error occurred during login: {e}")
-        print(f"ERROR (login_user): Unexpected Python Error during login for {email}: {e}")
+        print(f"ERROR (login_user): Unexpected Python Error during login for {email}: {e}") 
         time.sleep(2)
+        return False
 
 def logout_user():
     """Logs out the current user by resetting session state."""
-    print("DEBUG (logout_user): Initiating logout.")
+    print("DEBUG (logout_user): Initiating logout.") 
     st.session_state['logged_in'] = False
     st.session_state['user_name'] = ''
     st.session_state['user_email'] = ''
     st.session_state['user_uid'] = ''
-    st.session_state['is_admin'] = False
+    st.session_state['is_admin'] = False 
     st.session_state['ai_review_result'] = None
     st.session_state['generated_docx_buffer'] = None
     st.session_state['review_triggered'] = False
-    st.session_state['current_page'] = 'Login'
-    st.session_state['login_mode'] = None
-    st.session_state['new_user_email_for_pw_reset'] = ''
+    st.session_state['current_page'] = 'Login' 
+    st.session_state['login_mode'] = None 
+    st.session_state['new_user_email_for_pw_reset'] = '' 
     st.session_state['new_user_uid_for_pw_reset'] = ''
     st.success("Logged out successfully!")
-    print("DEBUG (logout_user): User logged out. Session state reset. Rerunning.")
-    st.rerun()
+    print("DEBUG (logout_user): User logged out. Session state reset. Rerunning.") 
+    st.rerun() 
 
 # --- Streamlit Page Functions ---
-
 def dashboard_page():
     """Displays the user dashboard."""
-    st.title(f"Welcome, {st.session_state['user_name']}!")
+    # Applying color directly with markdown for st.title, as it's not a generic h1 but specific
+    st.markdown(f"<h1 style='color: #0D47A1 !important;'>Welcome, {st.session_state['user_name']}!</h1>", unsafe_allow_html=True)
     st.write("This is your dashboard. Use the sidebar to navigate.")
     st.info("To get started, navigate to 'Upload JD & CV' to perform a new AI-powered comparative analysis.")
-    st.write("You can also check 'Review Reports' to see your past analyses.")
-    print(f"DEBUG (dashboard_page): Displaying dashboard for {st.session_state['user_name']}.")
-    
-    # Placeholder for a relevant image or more dashboard content
-    # st.image("path/to/your/sso_logo.png", use_column_width=True, caption="Application Overview") 
+    if st.session_state['is_admin']: # Only show for admin
+        st.write("As an admin, you can also check 'Review Reports' to see all past analyses.")
+    print(f"DEBUG (dashboard_page): Displaying dashboard for {st.session_state['user_name']}.") 
 
 def upload_jd_cv_page():
     """Handles JD and CV uploads, triggers AI review, and displays/downloads results."""
-    st.title("⬆️ Upload JD & CV for AI Review")
+    st.markdown("<h1 style='color: #0D47A1 !important;'>⬆️ Upload JD & CV for AI Review</h1>", unsafe_allow_html=True)
     st.write("Upload your Job Description and multiple Candidate CVs to start the comparative analysis.")
-    print("DEBUG (upload_jd_cv_page): Displaying upload page.")
+    print("DEBUG (upload_jd_cv_page): Displaying upload page.") 
 
-    # File upload widgets
     uploaded_jd = st.file_uploader("Upload Job Description (PDF, DOCX, TXT)", type=["pdf", "docx", "txt"], key="jd_uploader")
     uploaded_cvs = st.file_uploader("Upload Candidate's CVs (Multiple - PDF, DOCX, TXT)", type=["pdf", "docx", "txt"], accept_multiple_files=True, key="cv_uploader")
 
-    # Button to start AI review
     if st.button("Start AI Review", key="start_review_button"):
-        print("DEBUG (upload_jd_cv_page): 'Start AI Review' button clicked.")
+        print("DEBUG (upload_jd_cv_page): 'Start AI Review' button clicked.") 
         if not uploaded_jd:
             st.warning("Please upload a Job Description.")
             return
@@ -786,21 +849,18 @@ def upload_jd_cv_page():
             st.warning("Please upload at least one Candidate CV.")
             return
 
-        # Process JD file
         jd_text = get_file_content(uploaded_jd, uploaded_jd.name)
         
-        # Process multiple CV files
         all_candidates_data = []
-        cv_filenames_list = []
+        cv_filenames_list = [] 
         for cv_file in uploaded_cvs:
             cv_text = get_file_content(cv_file, cv_file.name)
             if cv_text:
                 all_candidates_data.append({'filename': cv_file.name, 'text': cv_text})
-                cv_filenames_list.append(cv_file.name)
+                cv_filenames_list.append(cv_file.name) 
             else:
                 st.warning(f"Could not process CV: {cv_file.name}. Skipping it.")
         
-        # Validate extracted content
         if not jd_text:
             st.error("Failed to extract text from the Job Description.")
             return
@@ -808,12 +868,10 @@ def upload_jd_cv_page():
             st.error("No valid CVs could be processed for analysis.")
             return
 
-        # Reset state variables before new review
-        st.session_state['review_triggered'] = False
+        st.session_state['review_triggered'] = False 
         st.session_state['ai_review_result'] = None
         st.session_state['generated_docx_buffer'] = None
 
-        # Perform AI analysis
         comparative_results = get_comparative_ai_analysis(jd_text, all_candidates_data)
 
         if "error" in comparative_results:
@@ -821,228 +879,261 @@ def upload_jd_cv_page():
         else:
             st.session_state['ai_review_result'] = comparative_results
             st.success("AI review completed successfully!")
-            print("DEBUG (upload_jd_cv_page): AI review successful. Preparing DOCX.")
+            print("DEBUG (upload_jd_cv_page): AI review successful. Preparing DOCX.") 
             
-            # Store filenames in session state immediately after successful review
             st.session_state['jd_filename_for_save'] = uploaded_jd.name
-            st.session_state['cv_filenames_for_save'] = cv_filenames_list
+            st.session_state['cv_filenames_for_save'] = cv_filenames_list 
 
-            # Generate DOCX buffer immediately after successful AI review
-            # Pass original filenames for DOCX header
             st.session_state['generated_docx_buffer'] = generate_docx_report(
                 comparative_results, 
                 st.session_state['jd_filename_for_save'], 
                 ", ".join(st.session_state['cv_filenames_for_save'])
             )
-            st.session_state['review_triggered'] = True
+            
+            # --- START OF CHATGPT SUGGESTED CHANGE: SAVE TO CLOUD BEFORE DISPLAYING DOWNLOAD BUTTON ---
+            # Generate filename for saving
+            timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+            download_filename = f"{st.session_state['user_name'].replace(' ', '')}_JD-CV_Comparison_Analysis_{timestamp_str}.docx"
 
-    # --- Display Results and Download Options ---
-    # Only display results if a review was successfully triggered and results exist
+            # Adding extra debug prints
+            print("DEBUG (upload_jd_cv_page): Calling save_report_on_download now...")
+            
+            # ✅ CALL save_report_on_download DIRECTLY here
+            save_report_on_download(
+                download_filename,
+                st.session_state['generated_docx_buffer'],
+                st.session_state['ai_review_result'],
+                st.session_state['jd_filename_for_save'],
+                st.session_state['cv_filenames_for_save']
+            )
+            print("DEBUG (upload_jd_cv_page): save_report_on_download call completed.")
+            # --- END OF CHATGPT SUGGESTED CHANGE ---
+
+            st.session_state['review_triggered'] = True 
+
     if st.session_state['review_triggered'] and st.session_state['ai_review_result']:
-        print("DEBUG (upload_jd_cv_page): Displaying AI review results section.")
+        print("DEBUG (upload_jd_cv_page): Displaying AI review results section.") 
         comparative_results = st.session_state['ai_review_result']
 
         st.subheader("AI Review Results:")
 
-        # Candidate Evaluation Table
         candidate_evaluations_data = comparative_results.get("candidate_evaluations", [])
         if candidate_evaluations_data:
             st.markdown("### 🧾 Candidate Evaluation Table")
             df_evaluations = pd.DataFrame(candidate_evaluations_data)
-            # Ensure all expected columns are present for consistent display
             expected_cols_eval = ["Candidate Name", "Match %", "Ranking", "Shortlist Probability", "Key Strengths", "Key Gaps", "Location Suitability", "Comments"]
             for col in expected_cols_eval:
                 if col not in df_evaluations.columns:
                     df_evaluations[col] = "N/A"
             df_evaluations = df_evaluations[expected_cols_eval]
+
             st.dataframe(df_evaluations, use_container_width=True, hide_index=True)
         
-        # Additional Observations Table
         criteria_observations_data = comparative_results.get("criteria_observations", [])
         if criteria_observations_data:
             st.markdown("### ✅ Additional Observations (Criteria Comparison)")
             df_criteria = pd.DataFrame(criteria_observations_data)
             st.dataframe(df_criteria, use_container_width=True, hide_index=True)
 
-        # General Observations Text
         additional_observations_text = comparative_results.get("additional_observations_text", "No general observations provided.")
         if additional_observations_text and additional_observations_text.strip() not in ["No general observations provided.", ""]:
             st.markdown("### General Observations")
             st.write(additional_observations_text)
 
-        # Final Shortlist Recommendation
         final_shortlist_recommendation = comparative_results.get("final_shortlist_recommendation", "No final recommendation provided.")
         if final_shortlist_recommendation and final_shortlist_recommendation.strip() not in ["No final recommendation provided.", ""]:
             st.markdown("### 📌 Final Shortlist Recommendation")
             st.write(final_shortlist_recommendation)
 
-        st.markdown("---")
-        
-        # --- Combined Download & Save Button ---
+        st.markdown("---") 
+
         st.subheader("Download & Save Report")
         
-        # Generate the unique filename with username and timestamp
-        timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
-        download_filename = f"{st.session_state['user_name'].replace(' ', '')}_JD-CV_Comparison_Analysis_{timestamp_str}.docx"
-
+        # --- START OF CHATGPT SUGGESTED CHANGE (Modified download button structure) ---
+        # No more on_click for save_report_on_download here as it's called earlier
         if st.session_state['generated_docx_buffer']:
             st.download_button(
-                label="Download & Save DOCX Report ⬇️☁️",
+                label="Download DOCX Report ⬇️", # Label changed for clarity
                 data=st.session_state['generated_docx_buffer'],
-                file_name=download_filename,
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                key="download_and_save_docx",
-                on_click=lambda: save_report_on_download(
-                    download_filename,
-                    st.session_state['generated_docx_buffer'],
-                    st.session_state['ai_review_result'],
-                    st.session_state['jd_filename_for_save'],
-                    st.session_state['cv_filenames_for_save']
-                )
+                file_name=download_filename, # Use the same filename generated for saving
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
+                key="download_docx_only" # New key for this button
             )
         else:
             st.warning("Run an AI review to generate a report for download and save.")
+        # --- END OF CHATGPT SUGGESTED CHANGE ---
 
-# Callback function for saving report when download button is clicked
 def save_report_on_download(filename, docx_buffer, ai_result, jd_original_name, cv_original_names):
     """Saves the report to Firebase Storage and Firestore metadata."""
-    st.info("Attempting to save report to cloud...")
-    print("DEBUG (save_report_on_download): Function started. User UID:", st.session_state.get('user_uid', 'N/A'))
-    print(f"DEBUG (save_report_on_download): Current bucket name from session_state: {st.session_state['bucket'].name}")
+    st.info("Attempting to save report to cloud... (This message will disappear shortly)") 
+    print("DEBUG (save_report_on_download): Function started. User UID:", st.session_state.get('user_uid', 'N/A')) 
+    
+    if db is None or bucket is None:
+        st.error("Application error: Firebase clients (db or bucket) not available for saving.")
+        print("ERROR (save_report_on_download): Firebase clients are None. Cannot save report.")
+        return
+
+    # Debug print to confirm the bucket name being used
+    print(f"DEBUG (save_report_on_download): Using bucket name: {FIREBASE_STORAGE_BUCKET_NAME}")
     
     storage_file_path = f"jd_cv_reports/{st.session_state['user_uid']}/{filename}"
-    download_url = None # Initialize download_url
+    download_url = None 
 
     try:
-        # 1. Upload DOCX to Firebase Storage
-        print(f"DEBUG (save_report_on_download): Attempting to upload file to Storage at: {storage_file_path}")
-        blob = st.session_state['bucket'].blob(storage_file_path)
-        docx_buffer.seek(0)
+        print(f"DEBUG (save_report_on_download): Attempting to upload file to Storage at: {storage_file_path}") 
+        # Create blob using the bucket object from session_state
+        blob = bucket.blob(storage_file_path) 
+        docx_buffer.seek(0) 
         blob.upload_from_string(docx_buffer.getvalue(), content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
         
-        blob.make_public()
+        blob.make_public() 
         download_url = blob.public_url
-        st.success(f"File uploaded to Firebase Storage successfully! URL: {download_url}")
-        print(f"DEBUG (save_report_on_download): File uploaded to Storage. Public URL: {download_url}")
+        st.success(f"File uploaded to Firebase Storage successfully! URL: {download_url}") 
+        print(f"DEBUG (save_report_on_download): File uploaded to Storage. Public URL: {download_url}") 
 
-        # 2. Prepare metadata for Firestore
         report_metadata = {
             "user_email": st.session_state['user_email'],
             "user_name": st.session_state['user_name'],
-            "user_uid": st.session_state['user_uid'],
+            "user_uid": st.session_state['user_uid'], 
             "jd_filename": jd_original_name,
-            "cv_filenames": cv_original_names,
-            "review_date": firestore.SERVER_TIMESTAMP,
-            "review_date_human": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            "cv_filenames": cv_original_names, 
+            "review_date": firestore.SERVER_TIMESTAMP, 
+            "review_date_human": datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 
             "outputDocFileName": filename,
             "outputDocURL": download_url,
-            "summary": ai_result.get("final_shortlist_recommendation", "No summary provided."),
-            "status": "Generated"
+            "summary": ai_result.get("final_shortlist_recommendation", "No summary provided.")
         }
-        print(f"DEBUG (save_report_on_download): Prepared Firestore metadata: {report_metadata}")
+        print(f"DEBUG (save_report_on_download): Prepared Firestore metadata: {report_metadata}") 
 
-        # 3. Save metadata to Firestore
         try:
-            st.session_state['db'].collection('jd_cv_reports').add(report_metadata)
-            st.success("Report metadata saved to Firestore successfully!")
-            print("DEBUG (save_report_on_download): Report metadata successfully added to Firestore.")
-        except exceptions.FirebaseError as firestore_e:
+            # Adding debug print before Firestore save
+            print("DEBUG (save_report_on_download): About to attempt saving metadata to Firestore...")
+            db.collection('jd_cv_reports').add(report_metadata) 
+            st.success("Report metadata saved to Firestore successfully!") 
+            print("DEBUG (save_report_on_download): Report metadata successfully added to Firestore.") 
+        except exceptions.FirebaseError as firestore_e: 
             st.error(f"Firestore save failed: {firestore_e}. Please check Firestore rules and quotas.")
-            print(f"ERROR (save_report_on_download): Firestore specific error: {firestore_e}")
-            if download_url:
+            print(f"ERROR (save_report_on_download): Firestore specific error: {firestore_e}") 
+            if download_url: 
                 try:
                     blob.delete()
                     print("DEBUG: Deleted file from Storage due to Firestore save failure.")
                 except Exception as e_del:
                     print(f"ERROR: Failed to delete Storage file after Firestore error: {e_del}")
-        except Exception as generic_e:
+        except Exception as generic_e: 
             st.error(f"An unexpected error occurred during Firestore save: {generic_e}.")
-            print(f"ERROR (save_report_on_download): Generic error during Firestore save: {generic_e}")
+            print(f"ERROR (save_report_on_download): Generic error during Firestore save: {generic_e}") 
             if download_url:
                 try:
                     blob.delete()
-                    print("DEBUG: Deleted file from Storage due to generic Firestore save failure.")
+                    print(f"DEBUG: Deleted file from Storage due to generic Firestore save failure. Error during delete: {e_del}") 
                 except Exception as e_del:
                     print(f"ERROR: Failed to delete Storage file after generic error: {e_del}")
 
-    except Exception as e:
+    except Exception as e: 
         st.error(f"Error during report upload or initial setup: {e}")
         print(f"ERROR (save_report_on_download): Overall error in function (Storage upload or initial setup): {e}")
 
     finally:
-        # Reset flags after attempt to save, regardless of success or failure
-        st.session_state['review_triggered'] = False
-        st.session_state['ai_review_result'] = None
-        st.session_state['generated_docx_buffer'] = None
-        st.session_state['jd_filename_for_save'] = "Job Description"
-        st.session_state['cv_filenames_for_save'] = []
-
-
+        # Note: These session state resets should ideally happen *after* the entire process including save.
+        # But since save_report_on_download is now called earlier, these might need re-evaluation
+        # based on desired UI behavior. For now, we leave them in the finally block of save_report_on_download.
+        # However, for clarity, it might be better to manage review_triggered in the calling function.
+        # Leaving as is for minimal change to save_report_on_download's existing finally.
+        pass # Removed direct resets here, as `review_triggered` is handled in `upload_jd_cv_page`
+        
 def review_reports_page():
     """Displays a table of past reports fetched from Firestore for the current user."""
-    st.title("📚 Review Your Past Reports")
+    st.markdown("<h1 style='color: #0D47A1 !important;'>📚 Review Your Past Reports</h1>", unsafe_allow_html=True)
     st.write("Here you can find a history of your AI-generated comparative analysis reports.")
-    print("DEBUG (review_reports_page): Displaying review reports page.")
+    print("DEBUG (review_reports_page): Displaying review reports page.") 
 
-    if not st.session_state['logged_in'] or not st.session_state['user_uid']:
+    if not st.session_state['logged_in'] or not st.session_state['user_uid'] or db is None:
         st.info("Please log in to view your past reports.")
-        print("DEBUG (review_reports_page): User not logged in, cannot fetch reports.")
+        if db is None:
+            print("ERROR: review_reports_page called but 'db' is None.")
+        else:
+            print("DEBUG (review_reports_page): User not logged in, cannot fetch reports.") 
         return
 
     try:
-        print(f"DEBUG (review_reports_page): Fetching reports for UID: {st.session_state['user_uid']}")
-        reports_ref = st.session_state['db'].collection('jd_cv_reports').where('user_uid', '==', st.session_state['user_uid']).order_by('review_date', direction=firestore.Query.DESCENDING)
-        docs = reports_ref.stream()
+        print(f"DEBUG (review_reports_page): Fetching reports for UID: {st.session_state['user_uid']}") 
+        # Querying reports for the current user, ordered by review_date
+        reports_ref = db.collection('jd_cv_reports').where('user_uid', '==', st.session_state['user_uid']).order_by('review_date', direction=firestore.Query.DESCENDING) 
+        docs = reports_ref.stream() 
 
         reviews_data = []
         for doc in docs:
             report = doc.to_dict()
             reviews_data.append({
-                "Report ID": doc.id,
+                "Report ID": doc.id, 
                 "Report Name": report.get('outputDocFileName', 'N/A'),
                 "Job Description": report.get('jd_filename', 'N/A'),
-                "Candidates": ", ".join(report.get('cv_filenames', [])),
+                "Candidates": ", ".join(report.get('cv_filenames', [])), 
                 "Date Generated": report.get('review_date_human', 'N/A'),
                 "Summary": report.get('summary', 'No summary provided.'),
-                "Download Link": report.get('outputDocURL', '')
+                "Download Link": report.get('outputDocURL', '') 
             })
         
         if reviews_data:
-            print(f"DEBUG (review_reports_page): Found {len(reviews_data)} reports.")
+            print(f"DEBUG (review_reports_page): Found {len(reviews_data)} reports.") 
             df = pd.DataFrame(reviews_data)
             st.dataframe(df,
                          column_config={
                              "Download Link": st.column_config.LinkColumn("Download File", display_text="⬇️ Download", help="Click to download the report file")
                          },
-                         hide_index=True,
-                         use_container_width=True)
+                         hide_index=True, 
+                         use_container_width=True) 
         else:
             st.info("No reports found yet for your account. Start by uploading JD & CVs!")
-            print("DEBUG (review_reports_page): No reports found for this user.")
+            print("DEBUG (review_reports_page): No reports found for this user.") 
+    except exceptions.FirebaseError as e: # Catch specific Firebase errors for better user guidance
+        error_message = str(e)
+        if "The query requires an index" in error_message:
+            index_link_match = re.search(r'https://console\.firebase\.google\.com/v1/r/project/[^"]+', error_message)
+            index_link = index_link_match.group(0) if index_link_match else "your Firebase console -> Firestore Database -> Indexes tab."
+            st.error(f"""
+            **Error: Database Index Missing!**
+            To view reports, a specific database index is required by Firebase when filtering and sorting.
+            
+            Please click the link below to create the index in your Firebase console:
+            
+            **[Create Firestore Index Here]({index_link})**
+            
+            After clicking the link and creating the index, please allow a few minutes for it to activate (status will change from "Building" to "Enabled"), then refresh this page.
+            """)
+            print(f"ERROR (review_reports_page): Firebase Indexing Error: {e}") 
+        else:
+            st.error(f"Error fetching your review reports: {e}")
+            print(f"ERROR (review_reports_page): Generic Firebase Error fetching reports: {e}") 
     except Exception as e:
         st.error(f"Error fetching your review reports: {e}")
-        print(f"ERROR (review_reports_page): Error fetching user reports: {e}")
+        print(f"ERROR (review_reports_page): Unexpected Error fetching reports: {e}") 
 
 
 # --- Admin Pages ---
-
 def admin_dashboard_page():
     """Admin dashboard overview."""
-    st.title("⚙️ Admin Dashboard")
+    st.markdown("<h1 style='color: #0D47A1 !important;'>⚙️ Admin Dashboard</h1>", unsafe_allow_html=True)
     st.write("Welcome to the Admin Panel. From here you can manage users and all generated reports.")
     st.info("Use the sidebar navigation to access User Management, Report Management, or Invite New Member.")
-    print("DEBUG (admin_dashboard_page): Displaying admin dashboard.")
+    print("DEBUG (admin_dashboard_page): Displaying admin dashboard.") 
 
 def admin_user_management_page():
     """Admin page to manage users."""
-    st.title("👥 Admin: User Management")
+    st.markdown("<h1 style='color: #0D47A1 !important;'>👥 Admin: User Management</h1>", unsafe_allow_html=True)
     st.write("View, manage roles, or delete users.")
-    print("DEBUG (admin_user_management_page): Displaying user management page.")
+    print("DEBUG (admin_user_management_page): Displaying user management page.") 
+
+    if db is None:
+        print("ERROR: admin_user_management_page called but 'db' is None.")
+        st.error("Application error: Database connection not established. Please refresh or contact support.")
+        return
 
     users_data = []
     try:
-        print("DEBUG (admin_user_management_page): Fetching all users from Firestore.")
-        users_ref = st.session_state['db'].collection('users')
+        print(f"DEBUG (admin_user_management_page): Fetching all users from Firestore.") 
+        users_ref = db.collection('users') 
         docs = users_ref.stream()
 
         for doc in docs:
@@ -1056,118 +1147,125 @@ def admin_user_management_page():
             })
         
         if users_data:
-            print(f"DEBUG (admin_user_management_page): Found {len(users_data)} users.")
+            print(f"DEBUG (admin_user_management_page): Found {len(users_data)} users.") 
             df_users = pd.DataFrame(users_data)
             st.dataframe(df_users, use_container_width=True, hide_index=True)
 
             st.markdown("---")
-            st.subheader("Manage User Actions")
+            st.markdown("<h3 style='color: #0D47A1 !important;'>Manage User Actions</h3>", unsafe_allow_html=True) # Changed to H3 with deep blue
 
             col1, col2 = st.columns(2) 
 
             with col1:
-                st.markdown("##### Toggle Admin Status")
+                st.markdown("<h5 style='color: #0D47A1 !important;'>Toggle Admin Status</h5>", unsafe_allow_html=True) # Changed to H5 with deep blue
                 user_email_toggle = st.text_input("User Email to Toggle Admin", key="toggle_admin_email")
                 if st.button("Toggle Admin Status", key="toggle_admin_button"):
                     if user_email_toggle:
                         try:
-                            print(f"DEBUG (admin_user_management_page): Toggling admin status for {user_email_toggle}.")
+                            print(f"DEBUG (admin_user_management_page): Toggling admin status for {user_email_toggle}.") 
                             user_record = auth.get_user_by_email(user_email_toggle)
-                            user_doc_ref = st.session_state['db'].collection('users').document(user_record.uid)
+                            user_doc_ref = db.collection('users').document(user_record.uid) 
                             user_doc = user_doc_ref.get()
                             if user_doc.exists:
                                 current_admin_status = user_doc.to_dict().get('isAdmin', False)
                                 if user_record.uid == st.session_state['user_uid'] and current_admin_status:
                                     st.error("You cannot revoke your own administrator privileges.")
-                                    print("DEBUG (admin_user_management_page): Self-revocation attempt blocked.")
+                                    print("DEBUG (admin_user_management_page): Self-revocation attempt blocked.") 
                                 else:
                                     user_doc_ref.update({'isAdmin': not current_admin_status})
                                     st.success(f"Admin status for {user_email_toggle} toggled to {not current_admin_status}.")
-                                    print(f"DEBUG (admin_user_management_page): Admin status for {user_email_toggle} set to {not current_admin_status}.")
+                                    print(f"DEBUG (admin_user_management_page): Admin status for {user_email_toggle} set to {not current_admin_status}.") 
                                     time.sleep(1)
                                     st.rerun()
                             else:
                                 st.error("User profile not found in Firestore.")
-                                print(f"ERROR (admin_user_management_page): User profile for {user_email_toggle} not found.")
+                                print(f"ERROR (admin_user_management_page): User profile for {user_email_toggle} not found.") 
                         except auth.AuthError as e:
                             st.error(f"Error finding user: {e}")
-                            print(f"ERROR (admin_user_management_page): Firebase Auth Error toggling: {e}")
+                            print(f"ERROR (admin_user_management_page): Firebase Auth Error toggling: {e}") 
                         except Exception as e:
                             st.error(f"Error toggling admin status: {e}")
-                            print(f"ERROR (admin_user_management_page): Generic Error toggling: {e}")
+                            print(f"ERROR (admin_user_management_page): Generic Error toggling: {e}") 
                     else:
                         st.warning("Please enter a user email to toggle admin status.")
             
             with col2:
-                st.markdown("##### Delete User")
+                st.markdown("<h5 style='color: #0D47A1 !important;'>Delete User</h5>", unsafe_allow_html=True) # Changed to H5 with deep blue
                 user_email_delete = st.text_input("User Email to Delete", key="delete_user_email")
                 if st.button("Delete User", key="delete_user_button"):
                     if user_email_delete:
                         if user_email_delete == st.session_state['user_email']:
                             st.error("You cannot delete your own admin account!")
-                            print("DEBUG (admin_user_management_page): Self-deletion attempt blocked.")
+                            print("DEBUG (admin_user_management_page): Self-deletion attempt blocked.") 
                         else:
                             try:
-                                print(f"DEBUG (admin_user_management_page): Deleting user {user_email_delete}.")
+                                print(f"DEBUG (admin_user_management_page): Deleting user {user_email_delete}.") 
                                 user_record = auth.get_user_by_email(user_email_delete)
                                 
-                                user_reports_ref = st.session_state['db'].collection('jd_cv_reports').where('user_uid', '==', user_record.uid)
+                                user_reports_ref = db.collection('jd_cv_reports').where('user_uid', '==', user_record.uid) 
                                 user_reports_docs = user_reports_ref.stream()
                                 for report_doc in user_reports_docs:
                                     report_data = report_doc.to_dict()
                                     storage_file_path = f"jd_cv_reports/{report_data['user_uid']}/{report_data['outputDocFileName']}"
                                     try:
-                                        blob_to_delete = st.session_state['bucket'].blob(storage_file_path)
+                                        blob_to_delete = bucket.blob(storage_file_path) 
                                         blob_to_delete.delete()
-                                        print(f"DEBUG (admin_user_management_page): Deleted Storage file for {user_email_delete}: {report_data['outputDocFileName']}.")
+                                        st.session_state['bucket'].blob(storage_file_path) 
+                                        print(f"DEBUG (admin_user_management_page): Deleted Storage file for {user_email_delete}: {report_data['outputDocFileName']}.") 
                                     except Exception as storage_e:
                                         st.warning(f"Could not delete storage file for {user_email_delete}: {report_data['outputDocFileName']}. Error: {storage_e}")
-                                        print(f"ERROR (admin_user_management_page): Storage deletion error for {user_email_delete}: {storage_e}")
+                                        print(f"ERROR (admin_user_management_page): Storage deletion error for {user_email_delete}: {storage_e}") 
                                     report_doc.reference.delete()
-                                    print(f"DEBUG (admin_user_management_page): Deleted Firestore document for {user_email_delete}: {report_doc.id}.")
+                                    print(f"DEBUG (admin_user_management_page): Deleted Firestore document for {user_email_delete}: {report_doc.id}.") 
 
                                 auth.delete_user(user_record.uid)
-                                st.session_state['db'].collection('users').document(user_record.uid).delete()
+                                db.collection('users').document(user_record.uid).delete() 
                                 
                                 st.success(f"User {user_email_delete} and all their associated data deleted successfully.")
-                                print(f"DEBUG (admin_user_management_page): User {user_email_delete} fully deleted.")
+                                print(f"DEBUG (admin_user_management_page): User {user_email_delete} fully deleted.") 
                                 time.sleep(1)
                                 st.rerun()
                             except auth.AuthError as e:
                                 st.error(f"Error finding/deleting user: {e}")
-                                print(f"ERROR (admin_user_management_page): Firebase Auth Error deleting: {e}")
+                                print(f"ERROR (admin_user_management_page): Firebase Auth Error deleting: {e}") 
                             except Exception as e:
                                 st.error(f"Error deleting user: {e}")
-                                print(f"ERROR (admin_user_management_page): Generic Error deleting user: {e}")
+                                print(f"ERROR (admin_user_management_page): Generic Error deleting user: {e}") 
                     else:
                         st.warning("Please enter a user email to delete.")
 
         else:
             st.info("No users registered yet or error fetching users.")
-            print("DEBUG (admin_user_management_page): No users found or fetch error.")
+            print("DEBUG (admin_user_management_page): No users found or fetch error.") 
 
     except Exception as e:
         st.error(f"Error fetching users for admin management: {e}")
-        print(f"ERROR (admin_user_management_page): Error fetching users for admin management: {e}")
+        print(f"ERROR (admin_user_management_page): Error fetching users for admin management: {e}") 
 
 
 def admin_report_management_page():
     """Admin page to manage all reports."""
-    st.title("📊 Admin: Report Management")
+    st.markdown("<h1 style='color: #0D47A1 !important;'>📊 Admin: Report Management</h1>", unsafe_allow_html=True)
     st.write("View and delete all AI-generated comparative analysis reports.")
-    print("DEBUG (admin_report_management_page): Displaying report management page.")
+    print("DEBUG (admin_report_management_page): Displaying report management page.") 
+
+    if db is None:
+        print("ERROR: admin_report_management_page called but 'db' is None.")
+        st.error("Application error: Database connection not established. Please refresh or contact support.")
+        return
 
     all_reports_data = []
     try:
-        print("DEBUG (admin_report_management_page): Fetching all reports from Firestore.")
-        reports_ref = st.session_state['db'].collection('jd_cv_reports').order_by('review_date', direction=firestore.Query.DESCENDING)
+        print(f"DEBUG (admin_report_management_page): Fetching all reports from Firestore.") 
+        # Querying all reports, ordered by review_date
+        reports_ref = db.collection('jd_cv_reports').order_by('review_date', direction=firestore.Query.DESCENDING) 
         docs = reports_ref.stream()
 
         for doc in docs:
             report_id = doc.id
             report_info = doc.to_dict()
             all_reports_data.append({
-                "Report ID": report_id,
+                "Report ID": doc.id, 
                 "Report Name": report_info.get('outputDocFileName', 'N/A'),
                 "Uploaded By": report_info.get('user_name', 'N/A'),
                 "Uploader Email": report_info.get('user_email', 'N/A'),
@@ -1175,13 +1273,13 @@ def admin_report_management_page():
                 "CV Filenames": ", ".join(report_info.get('cv_filenames', [])),
                 "Date Generated": report_info.get('review_date_human', 'N/A'),
                 "Summary": report_info.get('summary', 'No summary provided.'),
-                "Download Link": report_info.get('outputDocURL', '')
+                "Download Link": report_info.get('outputDocURL', '') 
             })
         
         if all_reports_data:
-            print(f"DEBUG (admin_report_management_page): Found {len(all_reports_data)} reports.")
-            df_reports = pd.DataFrame(all_reports_data)
-            st.dataframe(df_reports,
+            print(f"DEBUG (admin_report_management_page): Found {len(all_reports_data)} reports.") 
+            df = pd.DataFrame(all_reports_data)
+            st.dataframe(df,
                          column_config={
                              "Download Link": st.column_config.LinkColumn("Download File", display_text="⬇️ Download", help="Click to download the report file")
                          },
@@ -1189,53 +1287,77 @@ def admin_report_management_page():
                          use_container_width=True)
 
             st.markdown("---")
-            st.subheader("Delete Report")
+            st.markdown("<h3 style='color: #0D47A1 !important;'>Delete Report</h3>", unsafe_allow_html=True) # Changed to H3 with deep blue
             report_id_to_delete = st.text_input("Enter Report ID to Delete (from table above)", key="delete_report_id")
             
             if st.button("Delete Report", key="delete_report_button"):
                 if report_id_to_delete:
                     try:
-                        print(f"DEBUG (admin_report_management_page): Deleting report {report_id_to_delete}.")
-                        report_doc_ref = st.session_state['db'].collection('jd_cv_reports').document(report_id_to_delete)
+                        print(f"DEBUG (admin_report_management_page): Deleting report {report_id_to_delete}.") 
+                        report_doc_ref = db.collection('jd_cv_reports').document(report_id_to_delete) 
                         report_doc = report_doc_ref.get()
 
                         if report_doc.exists:
                             report_data = report_doc.to_dict()
                             storage_file_path = f"jd_cv_reports/{report_data['user_uid']}/{report_data['outputDocFileName']}"
                             
-                            blob_to_delete = st.session_state['bucket'].blob(storage_file_path)
+                            blob_to_delete = bucket.blob(storage_file_path) 
                             blob_to_delete.delete()
                             st.success(f"File '{report_data['outputDocFileName']}' deleted from Storage.")
-                            print(f"DEBUG (admin_report_management_page): Deleted Storage file: {storage_file_path}.")
+                            print(f"DEBUG (admin_report_management_page): Deleted Storage file: {storage_file_path}.") 
 
                             report_doc_ref.delete()
                             st.success(f"Report '{report_id_to_delete}' deleted from Firestore.")
-                            print(f"DEBUG (admin_report_management_page): Deleted Firestore document: {report_id_to_delete}.")
+                            print(f"DEBUG (admin_report_management_page): Deleted Firestore document: {report_id_to_delete}.") 
                             
                             time.sleep(1)
                             st.rerun()
                         else:
                             st.error("Report with this ID not found.")
-                            print(f"ERROR (admin_report_management_page): Report {report_id_to_delete} not found.")
+                            print(f"ERROR (admin_report_management_page): Report {report_id_to_delete} not found.") 
                     except Exception as e:
                         st.error(f"Error deleting report: {e}. Ensure Storage path is correct and rules allow deletion.")
-                        print(f"ERROR (admin_report_management_page): Error during report deletion for {report_id_to_delete}: {e}")
+                        print(f"ERROR (admin_report_management_page): Error during report deletion for {report_id_to_delete}: {e}") 
                 else:
                     st.warning("Please enter a Report ID to delete.")
 
         else:
             st.info("No reports found in the database.")
-            print("DEBUG (admin_report_management_page): No reports found in database.")
+            print("DEBUG (admin_report_management_page): No reports found in database.") 
 
+    except exceptions.FirebaseError as e: # Catch specific Firebase errors for better user guidance
+        error_message = str(e)
+        if "The query requires an index" in error_message:
+            index_link_match = re.search(r'https://console\.firebase\.google\.com/v1/r/project/[^"]+', error_message)
+            index_link = index_link_match.group(0) if index_link_match else "your Firebase console -> Firestore Database -> Indexes tab."
+            st.error(f"""
+            **Error: Database Index Missing!**
+            To view ALL reports, a specific database index is required by Firebase when ordering.
+            
+            Please click the link below to create the index in your Firebase console:
+            
+            **[Create Firestore Index Here]({index_link})**
+            
+            After clicking the link and creating the index, please allow a few minutes for it to activate (status will change from "Building" to "Enabled"), then refresh this page.
+            """)
+            print(f"ERROR (admin_report_management_page): Firebase Indexing Error: {e}") 
+        else:
+            st.error(f"Error fetching all reports for admin management: {e}")
+            print(f"ERROR (admin_report_management_page): Generic Firebase Error fetching all reports: {e}") 
     except Exception as e:
         st.error(f"Error fetching all reports for admin management: {e}")
-        print(f"ERROR (admin_report_management_page): Error fetching all reports: {e}")
+        print(f"ERROR (admin_report_management_page): Unexpected Error fetching all reports: {e}") 
 
 def admin_invite_member_page():
     """Admin page to invite and create new user accounts."""
-    st.title("➕ Admin: Invite New Member")
+    st.markdown("<h1 style='color: #0D47A1 !important;'>➕ Admin: Invite New Member</h1>", unsafe_allow_html=True)
     st.write("Create new user accounts directly and assign their initial role.")
-    print("DEBUG (admin_invite_member_page): Displaying invite member page.")
+    print("DEBUG (admin_invite_member_page): Displaying invite member page.") 
+
+    if db is None:
+        print("ERROR: admin_invite_member_page called but 'db' is None.")
+        st.error("Application error: Database connection not established. Please refresh or contact support.")
+        return
 
     status_message_placeholder = st.empty()
 
@@ -1247,7 +1369,7 @@ def admin_invite_member_page():
         assign_role = st.radio(
             "Assign Role:",
             ("User", "Admin"),
-            index=0,
+            index=0, 
             key="assign_role_radio"
         )
         
@@ -1261,58 +1383,58 @@ def admin_invite_member_page():
         submit_invite_button = st.form_submit_button("Invite New Member")
 
         if submit_invite_button:
-            print("DEBUG (admin_invite_member_page): 'Invite New Member' button clicked.")
+            print("DEBUG (admin_invite_member_page): 'Invite New Member' button clicked.") 
             if is_admin_new_user and not confirm_admin_invite:
                 status_message_placeholder.error("Please confirm to create an Administrator account by checking the box.")
-                print("DEBUG (admin_invite_member_page): Admin invite: checkbox not confirmed.")
-                return
+                print("DEBUG (admin_invite_member_page): Admin invite: checkbox not confirmed.") 
+                return 
             
             if not (new_user_email_input and new_username_input and new_user_password_input):
                 status_message_placeholder.warning("Please fill in all fields (Email, Username, Temporary Password).")
-                print("DEBUG (admin_invite_member_page): Admin invite: missing fields.")
+                print("DEBUG (admin_invite_member_page): Admin invite: missing fields.") 
                 return
 
             if not re.match(r"[^@]+@[^@]+\.[^@]+", new_user_email_input):
                 status_message_placeholder.warning("Please enter a valid email address.")
-                print("DEBUG (admin_invite_member_page): Admin invite: invalid email format.")
+                print("DEBUG (admin_invite_member_page): Admin invite: invalid email format.") 
                 return
 
             if len(new_user_password_input) < 6:
                 status_message_placeholder.warning("Temporary password should be at least 6 characters long (Firebase minimum).")
-                print("DEBUG (admin_invite_member_page): Admin invite: weak password.")
+                print("DEBUG (admin_invite_member_page): Admin invite: weak password.") 
                 return
             
             try:
                 with st.spinner("Inviting new member..."):
-                    print(f"DEBUG (admin_invite_member_page): Attempting to create user {new_user_email_input} with role {assign_role}.")
+                    print(f"DEBUG (admin_invite_member_page): Attempting to create user {new_user_email_input} with role {assign_role}.") 
                     user_record = auth.create_user(
                         email=new_user_email_input,
                         password=new_user_password_input,
                         display_name=new_username_input
                     )
                     
-                    st.session_state['db'].collection('users').document(user_record.uid).set({
+                    db.collection('users').document(user_record.uid).set({ 
                         'email': new_user_email_input,
                         'username': new_username_input,
                         'created_at': firestore.SERVER_TIMESTAMP,
                         'isAdmin': is_admin_new_user,
-                        'firstLoginRequired': True
+                        'firstLoginRequired': True 
                     })
                     status_message_placeholder.success(f"New user '{new_username_input}' ({new_user_email_input}) created successfully with role: {assign_role}!")
-                    print(f"DEBUG (admin_invite_member_page): User {new_user_email_input} created in Auth and Firestore.")
+                    print(f"DEBUG (admin_invite_member_page): User {new_user_email_input} created in Auth and Firestore.") 
                     
                     st.session_state['invite_email'] = ""
                     st.session_state['invite_username'] = ""
                     st.session_state['invite_password'] = ""
-                    st.session_state['assign_role_radio'] = "User"
+                    st.session_state['assign_role_radio'] = "User" 
                     if 'confirm_admin_invite' in st.session_state:
-                        st.session_state['confirm_admin_invite'] = False
+                        st.session_state['confirm_admin_invite'] = False 
 
                     time.sleep(2)
-                    st.rerun()
+                    st.rerun() 
             except exceptions.FirebaseError as e:
                 error_message = str(e)
-                print(f"ERROR (admin_invite_member_page): Firebase Error: {error_message}")
+                print(f"ERROR (admin_invite_member_page): Firebase Error: {error_message}") 
                 if "email-already-exists" in error_message:
                     status_message_placeholder.error("This email is already registered. Please use a different email.")
                 elif "auth/weak-password" in error_message:
@@ -1321,17 +1443,22 @@ def admin_invite_member_page():
                     status_message_placeholder.error(f"Error inviting new member: {error_message}")
             except Exception as e:
                 status_message_placeholder.error(f"An unexpected error occurred while inviting new member: {e}")
-                print(f"ERROR (admin_invite_member_page): Unexpected Python Error: {e}")
+                print(f"ERROR (admin_invite_member_page): Unexpected Python Error: {e}") 
 
 def update_password_page():
     """Page for new users to update their temporary password."""
-    st.title("🔑 Update Your Password")
+    st.markdown("<h1 style='color: #0D47A1 !important;'>🔑 Update Your Password</h1>", unsafe_allow_html=True)
     st.write("As a new member, please set your personal password to continue.")
-    print("DEBUG (update_password_page): Displaying update password page.")
+    print("DEBUG (update_password_page): Displaying update password page.") 
+
+    if db is None:
+        print("ERROR: update_password_page called but 'db' is None.")
+        st.error("Application error: Database connection not established. Please refresh or contact support.")
+        return
 
     if not st.session_state['new_user_uid_for_pw_reset']:
         st.warning("You must be logged in with a temporary account to access this page. Please log in.")
-        print("DEBUG (update_password_page): No user UID found for password reset. Redirecting.")
+        print("DEBUG (update_password_page): No user UID found for password reset. Redirecting.") 
         if st.button("Go to Login"):
             st.session_state['current_page'] = 'Login'
             st.rerun()
@@ -1343,98 +1470,86 @@ def update_password_page():
 
     with st.form("update_password_form"):
         current_temp_password = st.text_input("Current Temporary Password", type="password", help="The password you just used to log in.", key="current_temp_password")
-        new_password = st.text_input("New Password", type="password", help="Your new permanent password.", key="new_password")
-        confirm_new_password = st.text_input("Confirm New Password", type="password", help="Re-enter your new password to confirm.", key="confirm_new_password")
+        new_password = st.text_input("New Password", type="password", help="Your new permanent password.", key="new_password_input") # Changed key here
+        confirm_new_password = st.text_input("Confirm New Password", type="password", help="Re-enter your new password to confirm.", key="confirm_new_password_input") # Changed key here
         
         submit_update_button = st.form_submit_button("Update Password")
 
-        if submit_update_button:
-            print("DEBUG (update_password_page): 'Update Password' button clicked.")
+        if submit_update_button: 
+            print("DEBUG (update_password_page): 'Update Password' button clicked.") 
             if not (current_temp_password and new_password and confirm_new_password):
                 update_status_placeholder.warning("Please fill in all password fields.")
-                print("DEBUG (update_password_page): Missing password fields.")
+                print("DEBUG (update_password_page): Missing password fields.") 
                 return
             
             if new_password != confirm_new_password:
                 update_status_placeholder.error("New passwords do not match.")
-                print("DEBUG (update_password_page): New passwords mismatch.")
+                print("DEBUG (update_password_page): New passwords mismatch.") 
                 return
             
             if len(new_password) < 6:
                 update_status_placeholder.warning("New password must be at least 6 characters long.")
-                print("DEBUG (update_password_page): New password too short.")
+                print("DEBUG (update_password_page): New password too short.") 
                 return
 
             try:
                 with st.spinner("Updating password..."):
-                    print(f"DEBUG (update_password_page): Attempting to update password for UID: {st.session_state['new_user_uid_for_pw_reset']}")
+                    print(f"DEBUG (update_password_page): Attempting to update password for UID: {st.session_state['new_user_uid_for_pw_reset']}") 
                     auth.update_user(
                         uid=st.session_state['new_user_uid_for_pw_reset'],
                         password=new_password
                     )
 
-                    user_doc_ref = st.session_state['db'].collection('users').document(st.session_state['new_user_uid_for_pw_reset'])
+                    user_doc_ref = db.collection('users').document(st.session_state['new_user_uid_for_pw_reset']) 
                     user_doc_ref.update({'firstLoginRequired': False})
 
                     update_status_placeholder.success("Password updated successfully! Please log in with your new password.")
-                    print("DEBUG (update_password_page): Password updated and firstLoginRequired set to False.")
+                    print("DEBUG (update_password_page): Password updated and firstLoginRequired set to False.") 
                     time.sleep(2)
-                    logout_user()
+                    logout_user() 
 
             except exceptions.FirebaseError as e:
                 error_message = str(e)
-                print(f"ERROR (update_password_page): Firebase Error during password update: {error_message}")
+                print(f"ERROR (update_password_page): Firebase Error during password update: {error_message}") 
                 if "auth/weak-password" in error_message:
                     update_status_placeholder.error("The new password is too weak. Please choose a stronger one.")
                 else:
                     update_status_placeholder.error(f"Error updating password: {error_message}")
             except Exception as e:
                 update_status_placeholder.error(f"An unexpected error occurred: {e}")
-                print(f"ERROR (update_password_page): Unexpected Python Error during password update: {e}") 
+                print(f"ERROR (update_password_page): Unexpected Python Error: {e}") 
 
 
 # --- Main Streamlit Application Logic ---
 
 def main():
     """Main function to set up Streamlit page and handle navigation/authentication."""
-    # Call Firebase initialization here
-    # This must be called before any Firebase client (db, bucket) is used.
-    initialize_firebase_app() # Call the new initialization function
-
-    # Now, access the global db and bucket instances from session_state
-    # This ensures consistency since initialize_firebase_app now puts them there
-    global db, bucket
-    db = st.session_state.get('firestore_db')
-    bucket = st.session_state.get('bucket')
-
-    # Ensure Firebase is initialized before proceeding with app logic
-    if db is None or bucket is None:
-        st.warning("Firebase services not fully initialized. Please check configuration.")
-        # Do not st.stop() here as it might prevent rendering the error message itself
-        return # Stop main app logic until Firebase is ready
-
     # Robustly manage current_page state after login/logout
     if st.session_state['logged_in'] and st.session_state['current_page'] in ['Login', 'Signup']:
         st.session_state['current_page'] = 'Dashboard'
     elif not st.session_state['logged_in'] and st.session_state['current_page'] not in ['Login', 'Signup', 'Update Password']:
         st.session_state['current_page'] = 'Login'
-        st.session_state['login_mode'] = None
-    
-    with st.sidebar:
-        st.title("SSO Consultants")
-        st.subheader("AI Recruitment Dashboard")
-        st.markdown("---")
+        st.session_state['login_mode'] = None 
 
-        if st.session_state['logged_in']:
+    # Conditional rendering for sidebar (only if logged in)
+    if st.session_state['logged_in']:
+        with st.sidebar:
+            # Sidebar branding
+            st.markdown("<h1 style='color: #000000 !important;'>SSO Consultants</h1>", unsafe_allow_html=True) # Forced black
+            st.markdown("<h2 style='color: #000000 !important;'>AI Recruitment Dashboard</h2>", unsafe_allow_html=True) # Forced black
+            st.markdown("---") 
+
             st.write(f"Welcome, **{st.session_state['user_name']}**!")
             if st.session_state['is_admin']:
-                st.markdown("### Admin Privileges Active")
+                st.markdown("<h3 style='color: #000000 !important;'>Admin Privileges Active</h3>", unsafe_allow_html=True) # Forced black
             
-            user_pages = ['Dashboard', 'Upload JD & CV', 'Review Reports']
+            # Navigation for logged-in users (User & Admin)
+            user_pages = ['Dashboard', 'Upload JD & CV'] 
             admin_pages = ['Admin Dashboard', 'Admin: User Management', 'Admin: Report Management', 'Admin: Invite New Member'] 
             
             all_pages = user_pages 
             if st.session_state['is_admin']:
+                all_pages.extend(['Review Reports']) # Add back for admins only
                 all_pages.extend(admin_pages)
 
             try:
@@ -1446,7 +1561,7 @@ def main():
 
             def update_page_selection():
                 st.session_state['current_page'] = st.session_state['sidebar_radio_selection']
-                print(f"DEBUG (sidebar_radio): Page selected: {st.session_state['current_page']}")
+                print(f"DEBUG (sidebar_radio): Page selected: {st.session_state['current_page']}") 
 
             page_selection = st.radio(
                 "Navigation",
@@ -1457,50 +1572,19 @@ def main():
             )
 
             st.markdown("---")
-            if st.button("Logout", key="logout_button"):
+            if st.button("Logout", key="logout_button_sidebar"): # Unique key for sidebar logout
                 logout_user()
-        else:
-            st.subheader("Choose Login Type")
-            col_admin_login, col_user_login = st.columns(2)
-
-            with col_admin_login:
-                if st.button("Login as Admin", key="button_login_admin"):
-                    st.session_state['login_mode'] = 'admin'
-                    st.session_state['current_page'] = 'Login' 
-                    print("DEBUG (main): Admin login mode selected.")
-                    st.rerun()
-            with col_user_login:
-                if st.button("Login as User", key="button_login_user"):
-                    st.session_state['login_mode'] = 'user'
-                    st.session_state['current_page'] = 'Login' 
-                    print("DEBUG (main): User login mode selected.")
-                    st.rerun()
-            
-            if st.session_state['login_mode']:
-                st.markdown("---")
-                if st.session_state['current_page'] == 'Login':
-                    st.markdown(f"### 🔑 Login as {'Administrator' if st.session_state['login_mode'] == 'admin' else 'User'}", unsafe_allow_html=True)
-                    with st.form("login_form"):
-                        email = st.text_input("Email")
-                        password = st.text_input("Password", type="password")
-                        submit_button = st.form_submit_button("Login")
-                        if submit_button: 
-                            print(f"DEBUG (main): Login form submitted for {email}.")
-                            if email and password:
-                                login_user(email, password, login_as_admin_attempt=(st.session_state['login_mode'] == 'admin'))
-                            else:
-                                st.warning("Please enter both email and password.")
-            else:
-                st.info("Please select 'Login as Admin' or 'Login as User' to proceed.")
-
-    print(f"DEBUG (main rendering): Current page to render: {st.session_state['current_page']}")
-
-    if st.session_state['logged_in']:
+        
+        # Add a div to the main content area for logged-in users to override centering if needed
+        # This div should contain all the problematic grey text
+        st.markdown('<div class="logged-in-main-content">', unsafe_allow_html=True)
+        
+        # --- Render Logged-in Pages ---
         if st.session_state['current_page'] == 'Dashboard':
             dashboard_page()
         elif st.session_state['current_page'] == 'Upload JD & CV':
             upload_jd_cv_page()
-        elif st.session_state['current_page'] == 'Review Reports':
+        elif st.session_state['is_admin'] and st.session_state['current_page'] == 'Review Reports': 
             review_reports_page()
         elif st.session_state['is_admin'] and st.session_state['current_page'] == 'Admin Dashboard':
             admin_dashboard_page()
@@ -1515,12 +1599,55 @@ def main():
         else:
             st.error("Access Denied or Page Not Found. Please navigate using the sidebar.")
             print(f"ERROR (main rendering): Invalid page state for logged-in user: {st.session_state['current_page']}")
-    elif st.session_state['current_page'] == 'Update Password':
-        update_password_page()
-    else:
-        print("DEBUG (main rendering): Not logged in. Displaying login/mode selection.")
-        pass
+        
+        st.markdown('</div>', unsafe_allow_html=True) # Close the logged-in-main-content div
+    
+    # --- Main Content Area when NOT logged in (Login/Landing Page) ---
+    else: 
+        st.markdown("<h1 class='main-app-title'>SSO Consultants AI Recruitment System</h1>", unsafe_allow_html=True)
+        st.markdown("<p class='sub-app-title'>Streamlined Talent Acquisition with AI-Powered Insights</p>", unsafe_allow_html=True)
+        
+        # Use columns to center the buttons and potentially the login form
+        col_left_spacer_buttons, col_buttons, col_right_spacer_buttons = st.columns([1, 2, 1]) 
+        with col_buttons: # Buttons in the middle column
+            admin_col, user_col = st.columns(2)
+            with admin_col:
+                if st.button("Login as Admin", key="button_login_admin_main_page"): 
+                    st.session_state['login_mode'] = 'admin'
+                    st.session_state['current_page'] = 'Login' 
+                    print("DEBUG (main): Admin login mode selected from main page.") 
+                    st.rerun()
+            with user_col:
+                if st.button("Login as User", key="button_login_user_main_page"): 
+                    st.session_state['login_mode'] = 'user'
+                    st.session_state['current_page'] = 'Login' 
+                    print("DEBUG (main): User login mode selected from main page.") 
+                    st.rerun()
+        
+        # Display the 'Please select' message
+        col_left_spacer_info, col_info_center, col_right_spacer_info = st.columns([1, 2, 1])
+        with col_info_center:
+            if st.session_state['login_mode'] is None:
+                st.markdown("<p class='initial-info-message'>Please select 'Login as Admin' or 'Login as User' to proceed.</p>", unsafe_allow_html=True)
+        
+        # Only show login form if a mode has been selected
+        if st.session_state['login_mode']:
+            col_form_left, col_form_center, col_form_right = st.columns([1, 2, 1])
+            with col_form_center: # Form in the middle column
+                # The h3 for login form title is explicitly targeted here
+                st.markdown(f"<h3 style='text-align: center; color: #000000 !important;'>🔑 Login as {'Administrator' if st.session_state['login_mode'] == 'admin' else 'User'}</h3>", unsafe_allow_html=True) 
+                with st.form("login_form"):
+                    email = st.text_input("Email")
+                    password = st.text_input("Password", type="password")
+                    submit_button = st.form_submit_button("Login")
+                    if submit_button: 
+                        print(f"DEBUG (main): Login form submitted for {email}.") 
+                        if email and password:
+                            login_user(email, password, login_as_admin_attempt=(st.session_state['login_mode'] == 'admin'))
+                        else:
+                            st.warning("Please enter both email and password.")
 
+    # --- Custom FOOTER (Always visible at the bottom of the page) ---
     st.markdown(
         """
         <div style="
@@ -1542,5 +1669,6 @@ def main():
         unsafe_allow_html=True
     )
 
+# Entry point for the Streamlit application
 if __name__ == "__main__":
     main()
