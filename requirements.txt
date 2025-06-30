@@ -7,3 +7,4 @@ openpyxl
 bcrypt
 firebase-admin
 requests
+python-docx
