@@ -916,7 +916,7 @@ def upload_jd_cv_page():
             # --- START OF CHATGPT SUGGESTED CHANGE: SAVE TO CLOUD BEFORE DISPLAYING DOWNLOAD BUTTON ---
             # Generate filename for saving with a UUID for absolute uniqueness
             unique_id = uuid.uuid4().hex # Generate a unique hexadecimal string
-            download_filename = f"{st.session_state['user_name'].replace(' ', '')}_JD-CV_Comparison_Analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{unique_id}.docx"
+            download_filename = f"{st.session_state['user_name'].replace(' ', '')}_JD-CV_Comparison_Analysis_{datetime.now().strftime('%Y%m%d_%H%M%S_f%')}_{unique_id}.docx"
 
             # Adding extra debug prints
             print("DEBUG (upload_jd_cv_page): Calling save_report_on_download now...")
