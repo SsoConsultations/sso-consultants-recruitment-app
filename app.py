@@ -1044,7 +1044,6 @@ def delete_file_from_supabase_storage(file_path_in_storage, user_uid_for_deletio
         # If we reach here, the removal was successful (no exception was raised)
         print(f"DEBUG (delete_file_from_supabase_storage): Delete successful. Response data: {response_data}")
         return True
-            return False
     except Exception as e:
         print(f"ERROR (delete_file_from_supabase_storage): {e}")
         return False
