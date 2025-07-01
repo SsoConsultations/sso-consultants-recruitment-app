@@ -10,7 +10,7 @@ import time
 # --- Supabase Imports ---
 from supabase import create_client, Client
 from supabase.lib.client_options import ClientOptions
-from postgrest.exceptions import APIResponseException # For Supabase API errors
+from postgrest.exceptions import Exception # For Supabase API errors
 
 # --- AI & Document Processing Imports ---
 from openai import OpenAI
@@ -266,7 +266,7 @@ def login_user(email, password, login_as_admin_attempt=False):
                 st.error("Invalid email or password.")
                 print(f"DEBUG (login_user): Supabase login failed for {email}. Response: {response}")
                 return False
-    except APIResponseException as e:
+    except Exception as e:
         st.error(f"Login error: {e.message}")
         print(f"DEBUG (login_user): Supabase API error during login for {email}: {e.message}")
         return False
@@ -295,7 +295,7 @@ def register_user(email, password, role='candidate'):
             st.error(f"Registration failed: {response.session}")
             print(f"DEBUG (register_user): Supabase signup failed for {email}. Response: {response}")
             return False
-    except APIResponseException as e:
+    except Exception as e:
         st.error(f"Registration error: {e.message}")
         print(f"DEBUG (register_user): Supabase API error during registration for {email}: {e.message}")
         return False
@@ -315,7 +315,7 @@ def reset_password(email):
         else:
             st.error("Failed to send password reset email. Please try again.")
             return False
-    except APIResponseException as e:
+    except Exception as e:
         st.error(f"Password reset error: {e.message}")
         print(f"DEBUG (reset_password): Supabase API error during password reset for {email}: {e.message}")
         return False
@@ -345,7 +345,7 @@ def get_user_data(user_id):
     try:
         response = supabase.table('users').select('*').eq('id', user_id).single().execute()
         return response.data
-    except APIResponseException as e:
+    except Exception as e:
         if "PGRST204" in e.message: # No rows found
             return None
         st.error(f"Error fetching user data: {e.message}")
@@ -403,7 +403,7 @@ def get_candidate_by_id(candidate_id):
     try:
         response = supabase.table('candidates').select('*').eq('id', candidate_id).single().execute()
         return response.data
-    except APIResponseException as e:
+    except Exception as e:
         if "PGRST204" in e.message:
             return None
         st.error(f"Error fetching candidate: {e.message}")
@@ -460,7 +460,7 @@ def get_job_by_id(job_id):
     try:
         response = supabase.table('jobs').select('*').eq('id', job_id).single().execute()
         return response.data
-    except APIResponseException as e:
+    except Exception as e:
         if "PGRST204" in e.message:
             return None
         st.error(f"Error fetching job: {e.message}")
