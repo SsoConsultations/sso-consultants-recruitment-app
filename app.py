@@ -1006,14 +1006,18 @@ def upload_file_to_supabase(file_bytes, file_name, user_uid): # MODIFIED: Added 
         # MODIFIED: Use the determined client for upload
         response = supabase_target_client.storage.from_(bucket_name).upload(file_path_in_storage, file_bytes)
 
-        if response.status_code in [200, 201]: # 200 for existing, 201 for new
-            # Get public URL
-            public_url_response = supabase_target_client.storage.from_(bucket_name).get_public_url(file_path_in_storage)
-            return public_url_response
-        else:
-            st.error(f"Supabase Storage upload failed: {response.status_code} - {response.json()}")
-            print(f"ERROR (upload_file_to_supabase): Upload failed: {response.status_code} - {response.json()}")
-            return None
+        # Upload the file. If successful, it returns a dict. If not, it raises an exception.
+        response_data = supabase_target_client.storage.from_(bucket_name).upload(file_path_in_storage, file_bytes)
+
+        # If we reach here, the upload was successful (no exception was raised)
+        # The 'response_data' will contain information about the uploaded file,
+        # but we don't need to check its structure for success, just that it didn't error.
+        print(f"DEBUG (upload_file_to_supabase): Upload successful. Response data: {response_data}")
+
+        # Get public URL. This call itself will raise an error if the file isn't found,
+        # which would be caught by the outer try-except.
+        public_url_response = supabase_target_client.storage.from_(bucket_name).get_public_url(file_path_in_storage)
+        return public_url_response
     except Exception as e:
         st.error(f"Error uploading file to Supabase Storage: {e}")
         print(f"ERROR (upload_file_to_supabase): {e}")
