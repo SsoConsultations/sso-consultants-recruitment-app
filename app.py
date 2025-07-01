@@ -1007,18 +1007,14 @@ def upload_file_to_supabase(file_bytes, file_name, user_uid): # MODIFIED: Added 
         # MODIFIED: Use the determined client for upload
         response = supabase_target_client.storage.from_(bucket_name).upload(file_path_in_storage, file_bytes)
 
-        # Upload the file. If successful, it returns a dict. If not, it raises an exception.
-        response_data = supabase_target_client.storage.from_(bucket_name).upload(file_path_in_storage, file_bytes)
-
-        # If we reach here, the upload was successful (no exception was raised)
-        # The 'response_data' will contain information about the uploaded file,
-        # but we don't need to check its structure for success, just that it didn't error.
-        print(f"DEBUG (upload_file_to_supabase): Upload successful. Response data: {response_data}")
-
-        # Get public URL. This call itself will raise an error if the file isn't found,
-        # which would be caught by the outer try-except.
-        public_url_response = supabase_target_client.storage.from_(bucket_name).get_public_url(file_path_in_storage)
-        return public_url_response
+        if response.status_code in [200, 201]: # 200 for existing, 201 for new
+            # Get public URL
+            public_url_response = supabase_target_client.storage.from_(bucket_name).get_public_url(file_path_in_storage)
+            return public_url_response
+        else:
+            st.error(f"Supabase Storage upload failed: {response.status_code} - {response.json()}")
+            print(f"ERROR (upload_file_to_supabase): Upload failed: {response.status_code} - {response.json()}")
+            return None
     except Exception as e:
         st.error(f"Error uploading file to Supabase Storage: {e}")
         print(f"ERROR (upload_file_to_supabase): {e}")
@@ -1039,12 +1035,12 @@ def delete_file_from_supabase_storage(file_path_in_storage, user_uid_for_deletio
             print("DEBUG (delete_file_from_supabase_storage): Using regular client for user deletion.")
 
         # MODIFIED: Use the determined client for removal
-        # Attempt to remove the file. If successful, it returns a dict. If not, it raises an exception.
-        response_data = supabase_target_client.storage.from_(bucket_name).remove([file_path_in_storage])
-        
-        # If we reach here, the removal was successful (no exception was raised)
-        print(f"DEBUG (delete_file_from_supabase_storage): Delete successful. Response data: {response_data}")
-        return True
+        response = supabase_target_client.storage.from_(bucket_name).remove([file_path_in_storage])
+        if response.status_code == 200:
+            return True
+        else:
+            print(f"ERROR (delete_file_from_supabase_storage): Delete failed: {response.status_code} - {response.json()}")
+            return False
     except Exception as e:
         print(f"ERROR (delete_file_from_supabase_storage): {e}")
         return False
