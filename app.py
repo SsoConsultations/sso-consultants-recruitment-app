@@ -381,8 +381,7 @@ except Exception as e:
 
 # Admin Credentials (for a hardcoded admin user, outside Supabase Auth)
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@sso.com")
-ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH", bcrypt.hashpw("adminpass".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'))
-
+ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH", bcrypt.gensalt().decode('utf-8')) # Default hash for "adminpass" if not set
 
 # --- Streamlit Session State Initialization ---
 if 'logged_in' not in st.session_state:
@@ -1193,7 +1192,7 @@ def admin_report_management_page():
                             response = supabase.table('jd_cv_reports').delete().eq('id', report_id_to_delete).execute()
                             if response.data:
                                 st.success(f"Report '{report_id_to_delete}' deleted from Supabase table.")
-                                print(f"DEBUG (admin_report_management_page): Deleted Supabase table document: {report_id_to_delete}.")
+                                print(f"DEBUG (admin_report_management_page): Supabase table deletion failed: {response.json()}")
                             else:
                                 st.error(f"Failed to delete report from Supabase table: {response.json()}")
                                 print(f"ERROR (admin_report_management_page): Supabase table deletion failed: {response.json()}")
@@ -1370,18 +1369,7 @@ def update_password_page():
             try:
                 with st.spinner("Updating password..."):
                     print(f"DEBUG (update_password_page): Attempting to update password for UID: {st.session_state['new_user_uid_for_pw_reset']}")
-                    # Update password in Supabase Auth
-                    # Note: Supabase's update_user_by_id requires service_role key, which we don't use in client.
-                    # A user can update their own password via sign_in_with_password then update_user,
-                    # or by using reset_password_for_email flow.
-                    # For a "first login required" scenario, the most robust way is to use the reset_password_for_email flow
-                    # or have the user log in with temp password and then use update_user.
-                    # Given the current flow, we'll simulate an update via admin call (which needs service_role)
-                    # OR, more practically, guide the user to use the "Forgot Password" flow if they need to change.
-                    # For now, let's assume `admin.update_user_by_id` is available (which it is via admin client).
-
                     # Re-authenticate with the temporary password to get a valid session for the user
-                    # This is crucial for the user to be able to update their own password securely.
                     auth_response = supabase.auth.sign_in_with_password({
                         "email": st.session_state['new_user_email_for_pw_reset'],
                         "password": current_temp_password
