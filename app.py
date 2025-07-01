@@ -10,7 +10,6 @@ import time
 # --- Supabase Imports ---
 from supabase import create_client, Client
 from supabase.lib.client_options import ClientOptions
-from postgrest.exceptions import Exception # For Supabase API errors
 
 # --- AI & Document Processing Imports ---
 from openai import OpenAI
