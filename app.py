@@ -980,7 +980,7 @@ def upload_jd_cv_page():
 def upload_file_to_supabase(file_bytes, file_name, user_uid):
     """Uploads a file to Supabase Storage and returns its public URL."""
     try:
-        bucket_name = "app_files" # Ensure this bucket exists in your Supabase Storage
+        bucket_name = "app-files" # Ensure this bucket exists in your Supabase Storage
         # Use a unique path for each file, including user_uid for organization
         file_path_in_storage = f"jd_cv_reports/{user_uid}/{file_name}"
 
@@ -1003,7 +1003,7 @@ def upload_file_to_supabase(file_bytes, file_name, user_uid):
 def delete_file_from_supabase_storage(file_path_in_storage):
     """Deletes a file from Supabase Storage."""
     try:
-        bucket_name = "app_files"
+        bucket_name = "app-files"
         response = supabase.storage.from_(bucket_name).remove([file_path_in_storage])
         if response.status_code == 200:
             return True
