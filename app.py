@@ -1005,15 +1005,22 @@ def upload_file_to_supabase(file_bytes, file_name, user_uid): # MODIFIED: Added 
             print("DEBUG (upload_file_to_supabase): Using regular client for user upload.")
 
         # MODIFIED: Use the determined client for upload
-        response = supabase_target_client.storage.from_(bucket_name).upload(file_path_in_storage, file_bytes)
+        # Upload the file. If successful, it returns a dict. If not, it raises an exception.
+        # Adding 'upsert=True' here as a fallback to prevent 409 errors if uniqueness fails for some reason
+        # and to explicitly allow overwrites if the same file is uploaded again.
+        response_data = supabase_target_client.storage.from_(bucket_name).upload(file_path_in_storage, file_bytes, {"upsert": True}) # ADDED upsert=True
 
-        if response.status_code in [200, 201]: # 200 for existing, 201 for new
-            # Get public URL
+        # Check if response_data is valid (e.g., not None or empty)
+        if response_data:
+            print(f"DEBUG (upload_file_to_supabase): Upload successful. Response data: {response_data}")
+            # Get public URL. This call itself will raise an error if the file isn't found,
+            # which would be caught by the outer try-except.
             public_url_response = supabase_target_client.storage.from_(bucket_name).get_public_url(file_path_in_storage)
             return public_url_response
         else:
-            st.error(f"Supabase Storage upload failed: {response.status_code} - {response.json()}")
-            print(f"ERROR (upload_file_to_supabase): Upload failed: {response.status_code} - {response.json()}")
+            # This case might indicate an empty response or unexpected non-exception failure
+            st.error(f"Supabase Storage upload failed: Empty or invalid response from server.")
+            print(f"ERROR (upload_file_to_supabase): Upload failed - empty or invalid response. Response data: {response_data}")
             return None
     except Exception as e:
         st.error(f"Error uploading file to Supabase Storage: {e}")
@@ -1035,11 +1042,16 @@ def delete_file_from_supabase_storage(file_path_in_storage, user_uid_for_deletio
             print("DEBUG (delete_file_from_supabase_storage): Using regular client for user deletion.")
 
         # MODIFIED: Use the determined client for removal
-        response = supabase_target_client.storage.from_(bucket_name).remove([file_path_in_storage])
-        if response.status_code == 200:
+        # Attempt to remove the file. If successful, it returns a dict. If not, it raises an exception.
+        response_data = supabase_target_client.storage.from_(bucket_name).remove([file_path_in_storage])
+        
+        # Check if response_data is valid (e.g., not None or empty)
+        if response_data:
+            print(f"DEBUG (delete_file_from_supabase_storage): Delete successful. Response data: {response_data}")
             return True
         else:
-            print(f"ERROR (delete_file_from_supabase_storage): Delete failed: {response.status_code} - {response.json()}")
+            # This case might indicate an empty response or unexpected non-exception failure
+            print(f"ERROR (delete_file_from_supabase_storage): Delete failed - empty or invalid response. Response data: {response_data}")
             return False
     except Exception as e:
         print(f"ERROR (delete_file_from_supabase_storage): {e}")
