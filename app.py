@@ -1010,10 +1010,35 @@ def upload_file_to_supabase(file_bytes, file_name, user_uid): # MODIFIED: Added 
         # and to explicitly allow overwrites if the same file is uploaded again.
         # Upload the file. If successful, it returns a dict. If not, it raises an exception.
         # The 'upsert' option needs to be passed within a 'file_options' dictionary.
+        # Check if the file already exists before attempting to upload
+        # This will prevent the 409 error and the 'bool' header error if upsert was the issue.
+        try:
+            # Attempt to list files in the directory to see if our specific file exists
+            # Supabase Storage list method returns a list of file metadata if successful
+            list_response = supabase_target_client.storage.from_(bucket_name).list(
+                path=os.path.dirname(file_path_in_storage), # List files in the parent directory
+                options={"search": os.path.basename(file_path_in_storage)} # Search for the specific filename
+            )
+            
+            # If the list_response contains our file, it means it exists
+            file_exists = any(item['name'] == os.path.basename(file_path_in_storage) for item in list_response)
+            
+            if file_exists:
+                print(f"DEBUG (upload_file_to_supabase): File '{file_path_in_storage}' already exists. Attempting to delete before re-upload.")
+                # If it exists, delete it first. Use the same client for consistency.
+                supabase_target_client.storage.from_(bucket_name).remove([file_path_in_storage])
+                print(f"DEBUG (upload_file_to_supabase): Old file '{file_path_in_storage}' deleted.")
+        except Exception as e:
+            # Log any error during the existence check or initial delete, but don't stop the process yet
+            print(f"WARNING (upload_file_to_supabase): Error during pre-upload check/delete for {file_path_in_storage}: {e}")
+            # This might happen if the directory doesn't exist, which is fine.
+
+        # Now, attempt the upload without the 'upsert' option
+        # This operation will now always be an 'insert new file' after a potential delete.
         response_data = supabase_target_client.storage.from_(bucket_name).upload(
-            file_path_in_storage, 
-            file_bytes, 
-            file_options={"upsert": True} # MODIFIED: upsert needs to be inside file_options
+            file_path_in_storage,
+            file_bytes
+            # Removed file_options={"upsert": True}
         )
 
         # Check if response_data is valid (e.g., not None or empty)
