@@ -991,7 +991,7 @@ def upload_file_to_supabase(file_bytes, file_name, user_uid): # MODIFIED: Added 
     """Uploads a file to Supabase Storage and returns its public URL.
     Uses service_role client if user_uid is 'admin_special_uid'."""
     try:
-        bucket_name = "app_files" # MODIFIED: Ensure this bucket exists in your Supabase Storage (using underscore)
+        bucket_name = "app-files" # MODIFIED: Ensure this bucket exists in your Supabase Storage (using underscore)
         # Use a unique path for each file, including user_uid for organization
         file_path_in_storage = f"jd_cv_reports/{user_uid}/{file_name}"
 
@@ -1023,7 +1023,7 @@ def delete_file_from_supabase_storage(file_path_in_storage, user_uid_for_deletio
     """Deletes a file from Supabase Storage.
     Uses service_role client if user_uid_for_deletion_check is 'admin_special_uid'."""
     try:
-        bucket_name = "app_files" # MODIFIED: Using underscore
+        bucket_name = "app-files" # MODIFIED: Using underscore
 
         # ADDED: Determine which client to use for deletion
         if user_uid_for_deletion_check == "admin_special_uid":
