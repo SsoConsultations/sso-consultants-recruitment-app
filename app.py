@@ -10,6 +10,7 @@ import time
 # --- Supabase Imports ---
 from supabase import create_client, Client
 from supabase.lib.client_options import ClientOptions
+# from postgrest.exceptions import APIResponseException # Removed as per discussion to avoid ImportError
 
 # --- AI & Document Processing Imports ---
 from openai import OpenAI
@@ -22,13 +23,15 @@ from docx.enum.section import WD_SECTION_START
 from docx.enum.table import WD_ALIGN_VERTICAL
 
 # --- Streamlit Page Configuration (MUST BE THE FIRST ST COMMAND) ---
+# Set layout to wide to allow custom centering without Streamlit's default narrow column
 st.set_page_config(
     page_title="SSO Consultants AI Recruitment",
-    page_icon="�",
+    page_icon="🔍",
     layout="wide"
 )
 
 # --- Custom CSS for Styling ---
+# This applies global styles to the Streamlit app to match the desired look.
 st.markdown(
     """
     <style>
@@ -40,211 +43,698 @@ st.markdown(
     }
 
     /* Hide Streamlit header and footer by default */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-
-    /* Custom styling for the main content area to center it */
-    .stApp {
-        max-width: 1200px; /* Max width for content */
-        margin: auto; /* Center the content */
-        padding-top: 20px; /* Add some padding at the top */
-        padding-bottom: 80px; /* Space for the fixed footer */
+    .stApp > header {
+        display: none;
+    }
+    .stApp > footer {
+        display: none; /* We will render our own custom footer */
     }
 
-    /* Streamlit specific adjustments for better aesthetics */
-    .stButton>button {
-        background-color: #FF8C00; /* Orange background for buttons */
-        color: white !important; /* White text for buttons */
-        border-radius: 8px; /* Rounded corners for buttons */
+    /* Main Streamlit app container and content blocks */
+    .stApp, .css-18e3th9, .css-1d3f8gv {
+        background-color: #FFFFFF; /* Ensure all main content areas are white */
+        color: #000000 !important; /* Force black text for main content areas */
+    }
+
+    /* Specific targeting for ALL general text elements within the main Streamlit content area */
+    /* This overrides any default Streamlit grey text */
+    /* Targeting p, label, Streamlit-generated markdown/text spans, etc. */
+    body p, body label, 
+    .css-1d3f8gv p, .css-1d3f8gv label, 
+    .logged-in-main-content p, .logged-in-main-content label,
+    .stMarkdown span, .stText span, /* Targeting spans inside st.markdown/st.text where content actually resides */
+    .stTextInput input[type="text"], .stTextInput input[type="password"], /* Input field text */
+    .stTextInput label, .stFileUploader label,
+    .stSelectbox label, .stRadio label,
+    .stCheckbox label, .stDateInput label, .stNumberInput label, .stTextArea label,
+    .stProgress, .stDataFrame {
+        color: #000000 !important; /* Force all general text, labels, and alert text to pure black */
+    }
+
+    /* Customizing the sidebar - Now forcing to light gray */
+    /* Targeting both the main sidebar container and its inner content area for robustness */
+    .css-1lcbmhc, /* Main sidebar container */
+    .css-1lcbmhc > section[data-testid="stSidebarContent"] { /* Inner content area */
+        background-color: #F0F2F5 !important; /* FORCING Very Light Gray sidebar background - CRITICAL */
+        color: #000000 !important; /* Default text in sidebar to black */
+    }
+    /* Sidebar text elements - Force to black now that background is light */
+    .css-1lcbmhc .stRadio > label, 
+    .css-1lcbmhc h1, .css-1lcbmhc h2, .css-1lcbmhc h3, .css-1lcbmhc h4, .css-1lcbmhc h5, .css-1lcbmhc h6, 
+    .css-1lcbmhc p,
+    .css-1lcbmhc .stMarkdown p, .css-1lcbmhc .stText p { /* Also target markdown/text within sidebar */
+        color: #000000 !important; /* Force all sidebar text to pure black - CRITICAL */
+    }
+    /* Sidebar buttons - keep text white for contrast on blue background */
+    .css-1lcbmhc .stButton > button {
+        background-color: #0D47A1; 
+        color: white; 
+        border-radius: 0.5rem;
         border: none;
-        padding: 10px 20px;
+        padding: 0.5rem 1rem;
+    }
+
+    /* Styling for ALL buttons (st.button and st.form_submit_button) */
+    .stButton > button, 
+    .stForm button { /* Target buttons directly and buttons inside forms */
+        background-color: #1976D2 !important; /* Vibrant blue from logo - CRITICAL for all buttons */
+        color: white !important; /* Force button text to white - CRITICAL */
+        border-radius: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        font-size: 1.1rem;
+        border: none;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+        margin: 0.75rem; /* Consistent margin */
+        min-width: 180px; /* Ensure buttons have a consistent minimum width */
+    }
+    .stButton > button:hover, 
+    .stForm button:hover {
+        background-color: #0D47A1 !important; /* Darker blue on hover - CRITICAL */
+        transform: translateY(-2px);
+    }
+
+    /* Styling for forms and inputs */
+    .stForm {
+        padding: 2rem;
+        border-radius: 0.75rem;
+        background-color: #FFFFFF; /* White background for the form card */
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        margin-top: 2rem;
+        width: 100%; /* Ensure form takes full width of its column */
+        max-width: 500px; /* Limit form width for better appearance on large screens */
+    }
+    /* Labels within the form - explicitly pure black */
+    .stForm .stTextInput > label, 
+    .stForm .stSelectbox > label, 
+    .stForm .stRadio > label,
+    .stForm .stCheckbox > label {
         font-weight: bold;
-        transition: background-color 0.3s;
+        color: #000000 !important; /* Pure black for labels on white form background - CRITICAL */
+        margin-bottom: 0.5rem;
     }
-    .stButton>button:hover {
-        background-color: #FFA500; /* Lighter orange on hover */
+    /* Input fields (text typed by user) - explicitly pure black */
+    .stForm .stTextInput input[type="text"], 
+    .stForm .stTextInput input[type="password"] {
+        color: #000000 !important; /* Pure black text for input fields - CRITICAL */
+        background-color: #F8F8F8; /* Very light gray for input background */
+        border-radius: 0.5rem;
+        border: 1px solid #ced4da;
+        padding: 0.75rem 1rem;
+        width: 100%;
+        margin-bottom: 1rem;
+    }
+    .stTextInput input:focus {
+        border-color: #1976D2; /* Focus color matching logo blue */
+        box-shadow: 0 0 0 0.2rem rgba(25, 118, 210, 0.25); 
+    }
+    
+    /* Styling for Radio Buttons (User/Admin under Assign Role AND Sidebar Navigation Radio Buttons) */
+    /* Target the text itself inside the radio options */
+    .stRadio div[data-testid="stRadio"] label span p {
+        color: #000000 !important; /* Pure black for 'User', 'Admin', 'Dashboard' etc. text - CRITICAL */
+    }
+    /* Style the radio button circles (unselected) */
+    .stRadio div[data-testid="stRadio"] input[type="radio"] + div::before {
+        background-color: #FFFFFF !important; /* White background for unselected */
+        border: 2px solid #333333 !important; /* Dark border for unselected */
+        width: 18px !important; /* Consistent size */
+        height: 18px !important; /* Consistent size */
+        top: 3px !important; /* Adjust vertical alignment */
+        left: 0px !important; /* Adjust horizontal alignment */
+    }
+    /* Style the radio button circles (selected dot) */
+    .stRadio div[data-testid="stRadio"] input[type="radio"]:checked + div::after {
+        background-color: #1976D2 !important; /* Vibrant Blue for selected dot - CRITICAL */
+        width: 10px !important; /* Size of the inner dot */
+        height: 10px !important; /* Size of the inner dot */
+        top: 7px !important; /* Adjust vertical alignment of dot */
+        left: 4px !important; /* Adjust horizontal alignment of dot */
     }
 
-    /* Text input and text area styling */
-    .stTextInput>div>div>input, .stTextArea>div>div>textarea {
-        border-radius: 8px;
-        border: 1px solid #E0E0E0; /* Light grey border */
-        padding: 10px;
-        color: #000000; /* Black text for inputs */
-    }
-
-    /* Markdown styling for headers and text */
-    h1, h2, h3, h4, h5, h6 {
-        color: #FF8C00; /* Orange for headers */
-        font-weight: bold;
-    }
-    .stMarkdown {
-        color: #000000; /* Ensure markdown text is black */
-    }
-
-    /* Specific style for success/error messages */
+    /* Success/Error/Warning/Info messages */
     .stAlert {
-        border-radius: 8px;
+        border-radius: 0.5rem;
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+    }
+    .stAlert.success {
+        background-color: #d4edda; /* Light green */
+        color: #155724 !important; /* Dark green text - CRITICAL */
+        border-color: #c3e6cb;
+    }
+    .stAlert.error {
+        background-color: #f8d7da; /* Light red */
+        color: #721c24 !important; /* Dark red text - CRITICAL */
+        border-color: #f5c6cb;
+    }
+    .stAlert.warning {
+        background-color: #fff3cd; /* Light yellow */
+        color: #856404 !important; /* Dark yellow text - CRITICAL */
+        border-color: #ffeeba;
+    }
+    .stAlert.info { /* Explicitly targeting info alerts */
+        background-color: #d1ecf1; /* Light blue info box background */
+        color: #000000 !important; /* Pure black text - CRITICAL */
+        border-color: #bee5eb;
     }
 
-    /* Centering specific elements like images or logos */
-    .center-image {
-        display: block;
-        margin-left: auto;
-        margin-right: auto;
-        width: 50%; /* Adjust as needed */
+
+    /* Specific style for the initial info message on login page */
+    .initial-info-message {
+        font-size: 1.1em;
+        color: #000000 !important; /* Pure black for clear visibility - CRITICAL */
+        margin-top: 1.5rem; 
+        margin-bottom: 2rem;
+        font-style: italic;
     }
 
-    /* Custom styling for the main title */
-    .main-title {
-        text-align: center;
-        color: #FF8C00; /* Orange */
-        font-size: 2.5em;
-        margin-bottom: 30px;
+    /* Centering content within a column (applied to Streamlit's main block) */
+    .st-emotion-cache-16txt4v { 
+        display: flex;
+        flex-direction: column;
+        align-items: center; /* Center horizontally */
+        justify-content: flex-start; /* Align from top vertically */
+        min-height: 90vh; /* Ensure content pushes footer down on shorter pages */
+        padding-top: 3.5rem; /* Adjusted padding from top for the main title */
+    }
+
+    /* Styling for the central main title */
+    .main-app-title {
+        color: #0D47A1 !important; /* Deep Dark Blue for main title - CRITICAL */
+        font-size: 2.8em; 
         font-weight: bold;
+        margin-bottom: 0.5rem; 
+        text-align: center; /* Explicitly center align */
+    }
+    .sub-app-title {
+        color: #0D47A1 !important; /* Deep Dark Blue for subtitle - CRITICAL */
+        font-size: 1.3em; 
+        margin-bottom: 2.5rem; 
+        text-align: center; /* Explicitly center align */
     }
 
-    /* Custom styling for the sub-header */
-    .sub-header {
-        text-align: center;
-        color: #000000; /* Black */
-        font-size: 1.2em;
-        margin-bottom: 40px;
+    /* Specific targeting for all h1, h2, h3, h4, h5, h6 tags */
+    h1, h2, h3, h4, h5, h6 {
+        color: #0D47A1 !important; /* Deep Dark Blue for all headings - CRITICAL */
+    }
+    /* Override for the login form h3 to be pure black as requested */
+    /* Target the specific generated Streamlit h3 elements for the login prompt */
+    .st-emotion-cache-nahz7x h3, .st-emotion-cache-nahz7x { 
+        color: #000000 !important; /* Pure black for the login mode title - CRITICAL */
     }
 
-    /* Sidebar styling */
-    .css-1d391kg, .css-1lcbmhc { /* Streamlit sidebar classes */
-        background-color: #F8F8F8; /* Light grey background for sidebar */
-        color: #000000; /* Black text for sidebar */
-    }
 
-    /* Ensure selectbox and multiselect options are readable */
-    .stSelectbox>div>div, .stMultiSelect>div>div {
-        color: #000000;
-    }
-    .stSelectbox>div>div>div>div, .stMultiSelect>div>div>div>div {
-        color: #000000;
-    }
-
-    /* Adjustments for the file uploader */
-    .stFileUploader label {
-        color: #000000; /* Black text for file uploader label */
-    }
-
-    /* Custom styling for the "Powered by" text */
-    .powered-by {
-        text-align: center;
-        font-size: 0.9em;
-        color: #888888; /* Grey color */
-        margin-top: 20px;
-    }
-
-    /* Adjustments for expander */
-    .streamlit-expanderHeader {
-        background-color: #F0F0F0; /* Light grey for expander header */
-        color: #000000; /* Black text */
+    /* Top-right logo container */
+    .top-right-logo {
+        position: fixed; 
+        top: 10px; 
+        right: 10px; 
+        z-index: 9999; 
+        background-color: rgba(255, 255, 255, 0.0); /* Transparent background */
+        padding: 5px;
         border-radius: 8px;
-        padding: 10px;
+        border: 2px solid red; /* *** DEBUGGING BORDER - RETAINED AS REQUESTED *** */
     }
-    .streamlit-expanderContent {
-        background-color: #FFFFFF; /* White for expander content */
-        border: 1px solid #E0E0E0;
-        border-top: none;
-        border-radius: 0 0 8px 8px;
-        padding: 15px;
+    .top-right-logo img {
+        width: 100px; 
+        height: auto;
     }
 
-    /* Ensure all text is black by default unless specified */
-    p, li, div, span, a {
-        color: #000000;
+    /* Adjust padding/alignment for logged in pages, overriding centering for content */
+    .logged-in-main-content .st-emotion-cache-16txt4v {
+        align-items: flex-start; /* Reset to left align */
+        padding-top: 2rem; 
+        text-align: left;
+        margin-left: 1rem; 
+        margin-right: 1rem; 
+        width: calc(100% - 2rem); 
+    }
+    /* Force all text elements within the main content area (after login) to be pure black */
+    /* This is a broad rule for safety */
+    .logged-in-main-content p, 
+    .logged-in-main-content .stMarkdown, 
+    .logged-in-main-content .stText, 
+    .logged-in-main-content .stInfo, 
+    .logged-in-main-content .stWarning,
+    .logged-in-main-content .stError,
+    .logged-in-main-content label,
+    .logged-in-main-content .stSelectbox,
+    .logged-in-main-content .stRadio,
+    .logged-in-main-content .stCheckbox,
+    .logged-in-main-content .stDateInput,
+    .logged-in-main-content .stNumberInput,
+    .logged-in-main-content .stTextArea,
+    .logged-in-main-content .stProgress,
+    .logged-in-main-content .stDataFrame {
+        color: #000000 !important; /* Pure black for all general text and labels - CRITICAL */
+    }
+    /* Ensure headings on logged-in pages are deep dark blue */
+    .logged-in-main-content h1, 
+    .logged-in-main-content h2, 
+    .logged-in-main-content h3,
+    .logged-in-main-content h4,
+    .logged-in-main-content h5,
+    .logged-in-main-content h6 {
+        text-align: left; 
+        color: #0D47A1 !important; /* Deep Dark Blue for headings when logged in - CRITICAL */
+    }
+    .logged-in-main-content .stForm {
+        width: auto; 
+        max-width: none; 
     }
 
-    /* Specific styling for the AI-generated response text */
-    .ai-response-box {
-        background-color: #F9F9F9;
-        border-left: 5px solid #FF8C00;
-        padding: 15px;
-        border-radius: 8px;
-        margin-top: 20px;
-        color: #000000; /* Ensure text inside is black */
-    }
 
-    /* Styling for the application status badges */
-    .status-badge {
-        display: inline-block;
-        padding: 5px 10px;
-        border-radius: 5px;
-        font-weight: bold;
-        color: white;
-        text-align: center;
+    /* Hide the default Streamlit hamburger menu button and Share button */
+    .css-hi6a2p { 
+        display: none !important;
     }
-    .status-Pending { background-color: #FFC107; } /* Amber */
-    .status-Reviewed { background-color: #17A2B8; } /* Info Blue */
-    .status-Interview { background-color: #28A745; } /* Success Green */
-    .status-Rejected { background-color: #DC3545; } /* Danger Red */
-    .status-Hired { background-color: #6F42C1; } /* Purple */
+    .css-1dp5x4b { 
+        display: none !important;
+    }
+    .css-1gh6j8x { 
+        display: none !important;
+    }
     </style>
     """,
     unsafe_allow_html=True
 )
 
-# --- Global Constants and Configuration ---
-# Supabase Configuration
+# --- Inject Top-Right Logo HTML ---
+st.markdown(
+    f"""
+    <div class="top-right-logo">
+        <img src="https://raw.githubusercontent.com/SsoConsultations/sso-consultants-recruitment-app/main/logo.png" alt="Company Logo" onerror="this.onerror=null; this.src='https://placehold.co/100x100/A0A0A0/FFFFFF?text=Logo+Missing';">
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+# --- Configuration: NOW READING FROM ENVIRONMENT VARIABLES ---
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
-# Initialize Supabase Client
-try:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY, options=ClientOptions(postgrest_client_timeout=10))
-    st.session_state['supabase_client'] = supabase
-    print("Supabase client initialized successfully.")
-except Exception as e:
-    st.error(f"Error initializing Supabase: {e}. Please check your environment variables.")
-    st.stop() # Stop the app if Supabase cannot be initialized
+# --- Supabase Initialization Function ---
+def initialize_supabase_app():
+    """
+    Initializes the Supabase client and stores it in session state.
+    This function is called only once per app run or when 'supabase_client' is not in session state.
+    """
+    print("DEBUG: Attempting to initialize Supabase client...")
+    try:
+        if not SUPABASE_URL or not SUPABASE_KEY:
+            print("ERROR: Supabase URL or Key not found in environment variables.")
+            st.error("Supabase URL or Key not found in environment variables. Please configure them.")
+            st.stop()
 
-# OpenAI API Key
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-if OPENAI_API_KEY:
-    client_openai = OpenAI(api_key=OPENAI_API_KEY)
+        supabase_client_instance = create_client(SUPABASE_URL, SUPABASE_KEY, options=ClientOptions(postgrest_client_timeout=10))
+        st.session_state['supabase_client'] = supabase_client_instance
+        print("DEBUG: Supabase client initialized successfully and stored in session state.")
+        print(f"DEBUG: Session state 'supabase_client' is now: {type(st.session_state['supabase_client'])}")
+
+    except Exception as e:
+        print(f"ERROR: Error during Supabase initialization: {e}")
+        st.error(f"Error initializing Supabase: {e}. Please ensure your environment variables are correctly configured.")
+        st.stop()
+
+# --- Ensure Supabase is initialized and client is available in session state ---
+if 'supabase_client' not in st.session_state or st.session_state['supabase_client'] is None:
+    print("DEBUG: 'supabase_client' not found in session state or is None. Calling initialize_supabase_app().")
+    initialize_supabase_app()
 else:
-    st.warning("OpenAI API key not found. AI features will be disabled.")
-    client_openai = None
+    print("DEBUG: 'supabase_client' already exists in session state. Supabase previously initialized.")
+
+supabase = st.session_state['supabase_client']
+
+# --- Initialize OpenAI client ---
+try:
+    OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+    if not OPENAI_API_KEY:
+        st.error("OpenAI API key not found in environment variables. Please configure it.")
+        st.stop()
+    openai_client = OpenAI(api_key=OPENAI_API_KEY)
+    print("DEBUG: OpenAI client initialized successfully.")
+except Exception as e:
+    st.error(f"OpenAI client not initialized: {e}. Please check your OPENAI_API_KEY in environment variables.")
+    print(f"ERROR: OpenAI client initialization failed: {e}")
+    st.stop()
 
 # Admin Credentials (for a hardcoded admin user, outside Supabase Auth)
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@sso.com")
 ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH", bcrypt.hashpw("adminpass".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'))
 
-# --- Session State Initialization ---
+
+# --- Streamlit Session State Initialization ---
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
+if 'user_name' not in st.session_state:
+    st.session_state['user_name'] = ''
 if 'user_email' not in st.session_state:
-    st.session_state['user_email'] = None
-if 'user_role' not in st.session_state:
-    st.session_state['user_role'] = None # 'admin', 'recruiter', 'candidate'
+    st.session_state['user_email'] = ''
+if 'user_uid' not in st.session_state:
+    st.session_state['user_uid'] = ''
+if 'is_admin' not in st.session_state:
+    st.session_state['is_admin'] = False
+if 'ai_review_result' not in st.session_state:
+    st.session_state['ai_review_result'] = None
+if 'generated_docx_buffer' not in st.session_state:
+    st.session_state['generated_docx_buffer'] = None
+if 'review_triggered' not in st.session_state:
+    st.session_state['review_triggered'] = False
+if 'current_page' not in st.session_state:
+    st.session_state['current_page'] = 'Login'
+if 'jd_filename_for_save' not in st.session_state:
+    st.session_state['jd_filename_for_save'] = "Job Description"
+if 'cv_filenames_for_save' not in st.session_state:
+    st.session_state['cv_filenames_for_save'] = []
 if 'login_mode' not in st.session_state:
-    st.session_state['login_mode'] = 'user' # 'user' or 'admin' for login form
+    st.session_state['login_mode'] = None
+if 'new_user_email_for_pw_reset' not in st.session_state:
+    st.session_state['new_user_email_for_pw_reset'] = ''
+if 'new_user_uid_for_pw_reset' not in st.session_state:
+    st.session_state['new_user_uid_for_pw_reset'] = ''
 
-# --- Helper Functions for Supabase Operations ---
-
-def get_supabase_client():
-    if 'supabase_client' not in st.session_state:
-        st.error("Supabase client not initialized.")
-        st.stop()
-    return st.session_state['supabase_client']
-
-# --- Auth Operations ---
-def login_user(email, password, login_as_admin_attempt=False):
-    supabase = get_supabase_client()
+# --- Helper Functions for Text Extraction ---
+def extract_text_from_pdf(uploaded_file_bytes_io):
+    """Extracts text from a PDF file using PyPDF2."""
     try:
+        reader = PdfReader(uploaded_file_bytes_io)
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text() or ""
+        return text
+    except Exception as e:
+        st.error(f"Error extracting text from PDF: {e}")
+        print(f"ERROR (extract_text_from_pdf): {e}")
+        return None
+
+def extract_text_from_docx(uploaded_file_bytes_io):
+    """Extracts text from a DOCX file using python-docx."""
+    try:
+        document = Document(uploaded_file_bytes_io)
+        text = ""
+        for paragraph in document.paragraphs:
+            text += paragraph.text + "\n"
+        return text
+    except Exception as e:
+        st.error(f"Error extracting text from DOCX: {e}")
+        print(f"ERROR (extract_text_from_docx): {e}")
+        return None
+
+def get_file_content(uploaded_file_bytes_io, filename):
+    """Determines file type based on extension and extracts text content."""
+    file_extension = os.path.splitext(filename)[1].lower()
+
+    if file_extension == '.pdf':
+        return extract_text_from_pdf(uploaded_file_bytes_io)
+    elif file_extension == '.docx':
+        return extract_text_from_docx(uploaded_file_bytes_io)
+    elif file_extension == '.txt':
+        return uploaded_file_bytes_io.read().decode('utf-8')
+    else:
+        st.error(f"Unsupported file type: {file_extension}. Only PDF, DOCX, TXT are supported.")
+        print(f"ERROR (get_file_content): Unsupported file type {file_extension} for {filename}")
+        return None
+
+# --- AI Function: Comparative Analysis ---
+def get_comparative_ai_analysis(jd_text, all_cv_data):
+    """
+    Uses OpenAI to perform a comparative analysis of multiple CVs against a JD.
+    Returns a complex JSON object containing a table of candidate evaluations,
+    a table of criteria observations, additional observations text, and a final
+    shortlist recommendation.
+    """
+    if not jd_text or not all_cv_data:
+        print("DEBUG (get_comparative_ai_analysis): Missing JD or CV data.")
+        return {"error": "Missing Job Description or Candidate CV content for comparative analysis."}
+
+    # System prompt defines the AI's role and the required JSON output format
+    system_prompt = """
+    You are an expert Talent Acquisition professional in India. Your task is to perform a detailed comparative analysis of multiple candidate CVs against a given Job Description (JD).
+
+    Your output MUST be a single JSON object with the following structure, containing two distinct arrays for tables and two strings for text sections:
+    {
+      "candidate_evaluations": [
+        {
+          "Candidate Name": "...",       // Derived from filename (e.g., "Charlie")
+          "Match %": "...",              // Numerical percentage as a string (e.g., "85%")
+          "Ranking": "...",              // E.g., "1", "2", "3", etc. (NO MEDALS)
+          "Shortlist Probability": "...",// E.g., "High", "Moderate", "Low"
+          "Key Strengths": "...",        // Concise points, comma-separated or short phrase. Highlight relevant relevant experience.
+          "Key Gaps": "...",             // Concise points, comma-separated or short phrase.
+          "Location Suitability": "...", // E.g., "Pune", "Delhi (flexible)", "Remote", "Not Specified"
+          "Comments": "..."              // Any other relevant observation for this candidate, including fit for Indian context.
+        },
+        // ... more candidate evaluation objects for each CV ...
+      ],
+      "criteria_observations": [ // This array is for the second table comparing candidates across common criteria
+        {
+          "Criteria": "Education (MBA HR)",
+          "Candidate 1 Name": "✅/❌/⚠️", // Column for each candidate provided (e.g., "Himanshukulkarni")
+          "Candidate 2 Name": "✅/❌/⚠️",
+          // ... more candidate columns based on actual input filenames
+        },
+        {
+          "Criteria": "Recruitment / TA Experience",
+          "Candidate 1 Name": "✅/❌/⚠️",
+          "Candidate 2 Name": "✅/❌/⚠️",
+        },
+        // ... more criteria rows ...
+      ],
+      "additional_observations_text": "...", // Comprehensive text for general observations not covered in tables.
+      "final_shortlist_recommendation": "..." // Concise text for the final recommendation, explicitly naming shortlisted candidates.
+    }
+
+    Ensure "Match %" is a string.
+    Ensure "Ranking" is a numerical rank string (e.g., "1", "2") without any emoji symbols (like 🥇, 🥈, 🥉).
+    For "criteria_observations", dynamically create columns for each candidate using their names (e.g., "Gauri Deshmukh", "Himanshukulkarni"). Use ✅ for good fit, ❌ for not a fit, ⚠️ for partial fit.
+    Make sure all text fields are within the string limits of JSON.
+    The "Candidate Name" in "candidate_evaluations" and the dynamic column headers in "criteria_observations" should be derived from the provided filenames (e.g., "Gauri CV.pdf" -> "Gauri").
+    """
+
+    user_prompt = f"""
+    Here is the Job Description (JD):
+    ---
+    {jd_text}
+    ---
+
+    Here are the Candidate CVs for comparative analysis:
+    """
+    # Append each CV's content to the user prompt
+    for idx, cv_item in enumerate(all_cv_data):
+        # Extract name without extension for table headers
+        candidate_name_for_prompt = os.path.splitext(cv_item['filename'])[0].replace(" CV", "").strip()
+        user_prompt += f"\n--- Candidate {idx+1} (Name: {candidate_name_for_prompt}, Filename: {cv_item['filename']}) ---\n"
+        user_prompt += f"{cv_item['text']}\n"
+    user_prompt += "--- End of Candidate CVs ---"
+    user_prompt += "\n\nPlease provide the comparative analysis in the specified JSON format."
+
+    try:
+        with st.spinner("AI is analyzing the JD and CVs... This may take a moment."):
+            print("DEBUG (get_comparative_ai_analysis): Sending request to OpenAI API.")
+            response = openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.2,
+                response_format={"type": "json_object"}
+            )
+        ai_response_content = response.choices[0].message.content
+        print(f"DEBUG (get_comparative_ai_analysis): Raw AI Response: {ai_response_content[:200]}...")
+        comparative_data = json.loads(ai_response_content)
+
+        if "candidate_evaluations" in comparative_data:
+            for candidate in comparative_data["candidate_evaluations"]:
+                if "Ranking" in candidate and isinstance(candidate["Ranking"], str):
+                    candidate["Ranking"] = re.sub(r'[\U0001F3C5-\U0001F3CA\U0001F947-\U0001F949]', '', candidate["Ranking"]).strip()
+
+        print("DEBUG (get_comparative_ai_analysis): AI analysis successful.")
+        return comparative_data
+
+    except json.JSONDecodeError as e:
+        st.error(f"Error: AI response was not valid JSON. Please try again or refine input. Error: {e}")
+        st.code(ai_response_content)
+        print(f"ERROR (get_comparative_ai_analysis): JSON Decode Error: {e}, Response: {ai_response_content}")
+        return {"error": f"AI response format error: {e}"}
+    except Exception as e:
+        st.error(f"An unexpected error occurred during AI analysis: {e}")
+        print(f"ERROR (get_comparative_ai_analysis): Unexpected Error during AI analysis: {e}")
+        return {"error": f"AI processing failed: {e}"}
+
+# --- DOCX Generation Function ---
+def generate_docx_report(comparative_data, jd_filename="Job Description", cv_filenames_str="Candidates"):
+    """
+    Generates a DOCX report based on the comparative AI analysis data.
+    Includes two tables and text sections.
+    """
+    try:
+        document = Document()
+
+        section = document.sections[0]
+        section.start_type = WD_SECTION_START.NEW_PAGE
+        section.left_margin = Inches(1)
+        section.right_margin = Inches(1)
+        section.top_margin = Inches(1)
+        section.bottom_margin = Inches(1)
+
+        document.add_heading("JD-CV Comparative Analysis Report", level=0)
+        document.add_paragraph().add_run("Generated by SSO Consultants AI").italic = True
+        document.add_paragraph().add_run(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}").small_caps = True
+        document.add_paragraph(f"Job Description: {jd_filename}\nCandidates: {cv_filenames_str}")
+        document.add_paragraph("\n")
+
+        candidate_evaluations_data = comparative_data.get("candidate_evaluations", [])
+        criteria_observations_data = comparative_data.get("criteria_observations", [])
+        additional_observations_text = comparative_data.get("additional_observations_text", "No general observations provided.")
+        final_shortlist_recommendation = comparative_data.get("final_shortlist_recommendation", "No final recommendation provided.")
+
+        if candidate_evaluations_data:
+            document.add_heading("🧾 Candidate Evaluation Table", level=1)
+            document.add_paragraph("Detailed assessment of each candidate against the Job Description:")
+
+            df_evaluations = pd.DataFrame(candidate_evaluations_data)
+
+            expected_cols_eval = ["Candidate Name", "Match %", "Ranking", "Shortlist Probability", "Key Strengths", "Key Gaps", "Location Suitability", "Comments"]
+            for col in expected_cols_eval:
+                if col not in df_evaluations.columns:
+                    df_evaluations[col] = "N/A"
+            df_evaluations = df_evaluations[expected_cols_eval]
+
+            table_eval = document.add_table(rows=1, cols=len(df_evaluations.columns))
+            table_eval.style = 'Table Grid'
+
+            hdr_cells_eval = table_eval.rows[0].cells
+            for i, col_name in enumerate(df_evaluations.columns):
+                hdr_cells_eval[i].text = col_name
+                for paragraph in hdr_cells_eval[i].paragraphs:
+                    for run in paragraph.runs:
+                        run.bold = True
+                        run.font.size = Pt(9)
+                hdr_cells_eval[i].vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+
+            for index, row in df_evaluations.iterrows():
+                row_cells = table_eval.add_row().cells
+                for i, cell_value in enumerate(row):
+                    row_cells[i].text = str(cell_value)
+                    for paragraph in row_cells[i].paragraphs:
+                        for run in paragraph.runs:
+                            run.font.size = Pt(9)
+
+            document.add_paragraph("\n")
+
+        if criteria_observations_data:
+            document.add_heading("✅ Additional Observations (Criteria Comparison)", level=1)
+
+            df_criteria = pd.DataFrame(criteria_observations_data)
+
+            table_criteria = document.add_table(rows=1, cols=len(df_criteria.columns))
+            table_criteria.style = 'Table Grid'
+
+            hdr_cells_criteria = table_criteria.rows[0].cells
+            for i, col_name in enumerate(df_criteria.columns):
+                hdr_cells_criteria[i].text = col_name
+                for paragraph in hdr_cells_criteria[i].paragraphs:
+                    for run in paragraph.runs:
+                        run.bold = True
+                        run.font.size = Pt(9)
+                hdr_cells_criteria[i].vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+
+            for index, row in df_criteria.iterrows():
+                row_cells = table_criteria.add_row().cells
+                for i, cell_value in enumerate(row):
+                    row_cells[i].text = str(cell_value)
+                    for paragraph in row_cells[i].paragraphs:
+                        for run in paragraph.runs:
+                            run.font.size = Pt(9)
+
+            document.add_paragraph("\n")
+
+        if additional_observations_text and additional_observations_text.strip() not in ["No general observations provided.", ""]:
+            document.add_heading("General Observations", level=2)
+            document.add_paragraph(additional_observations_text)
+            document.add_paragraph("\n")
+
+        if final_shortlist_recommendation and final_shortlist_recommendation.strip() not in ["No final recommendation provided.", ""]:
+            document.add_heading("📌 Final Shortlist Recommendation", level=1)
+            final_rec_para = document.add_paragraph()
+            final_rec_para.add_run(final_shortlist_recommendation).bold = True
+            document.add_paragraph("\n")
+
+        doc_io = io.BytesIO()
+        document.save(doc_io)
+        doc_io.seek(0)
+        print("DEBUG (generate_docx_report): DOCX generated successfully.")
+        return doc_io
+    except Exception as e:
+        st.error(f"Error generating DOCX report: {e}")
+        print(f"ERROR (generate_docx_report): {e}")
+        return None
+
+# --- Supabase Authentication Functions ---
+def register_user(email, password, username):
+    """Registers a new user in Supabase Auth and stores user profile in the 'users' table."""
+    try:
+        print(f"DEBUG (register_user): Attempting to sign up user {email}")
+        response = supabase.auth.sign_up({"email": email, "password": password})
+
+        if response.user:
+            user_id = response.user.id
+            # Store user profile in 'users' table
+            user_data = {
+                'id': user_id,
+                'email': email,
+                'username': username,
+                'created_at': datetime.now().isoformat(), # Use ISO format for Supabase timestamp
+                'isAdmin': False,
+                'firstLoginRequired': True
+            }
+            supabase.table('users').insert(user_data).execute()
+            st.success(f"Account created successfully for {username}! Please check your email to verify and then log in.")
+            print(f"DEBUG (register_user): User {username} created and profile saved.")
+            time.sleep(2)
+            return True
+        else:
+            st.error(f"Registration failed: {response.session.user.message if response.session and response.session.user else 'Unknown error'}")
+            print(f"DEBUG (register_user): Supabase signup failed for {email}. Response: {response}")
+            return False
+    except Exception as e: # Catching general Exception as APIResponseException import was removed
+        error_message = str(e)
+        st.error(f"Error creating account: {error_message}")
+        print(f"ERROR (register_user): {error_message}")
+        time.sleep(2)
+        if "User already registered" in error_message or "duplicate key value violates unique constraint" in error_message:
+            st.error("This email is already registered.")
+        return False
+
+def login_user(email, password, login_as_admin_attempt=False):
+    """Logs in a user by verifying their existence in Supabase Auth.
+    Also fetches user's admin status from 'users' table and enforces login type.
+    Redirects to password update if first login is required."""
+
+    if supabase is None:
+        print("ERROR: login_user called but 'supabase' is None. Supabase initialization failed or was not completed.")
+        st.error("Application error: Database connection not established. Please refresh or contact support.")
+        return False
+
+    try:
+        print(f"DEBUG (login_user): Attempting to log in {email}")
+
         if login_as_admin_attempt:
             # Check against hardcoded admin credentials
             if email == ADMIN_EMAIL and bcrypt.checkpw(password.encode('utf-8'), ADMIN_PASSWORD_HASH.encode('utf-8')):
                 st.session_state['logged_in'] = True
                 st.session_state['user_email'] = email
-                st.session_state['user_role'] = 'admin'
+                st.session_state['user_name'] = "Admin" # Hardcoded name for the special admin
+                st.session_state['user_uid'] = "admin_special_uid" # Placeholder UID for special admin
+                st.session_state['is_admin'] = True
                 st.success("Admin login successful!")
+                print(f"DEBUG (login_user): Special Admin logged in: {email}.")
+                time.sleep(1)
+                st.session_state['current_page'] = 'Dashboard'
                 st.rerun()
+                return True
             else:
                 st.error("Invalid admin credentials.")
                 print(f"DEBUG (login_user): Admin login failed for {email}.")
@@ -252,952 +742,793 @@ def login_user(email, password, login_as_admin_attempt=False):
         else:
             # Attempt to sign in via Supabase Auth
             response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+
             if response.user:
+                user_id = response.user.id
+                # Fetch user's data from 'users' table
+                user_data_response = supabase.table('users').select('*').eq('id', user_id).single().execute()
+                user_data = user_data_response.data if user_data_response.data else {}
+
+                is_user_admin_in_db = user_data.get('isAdmin', False)
+                first_login_required = user_data.get('firstLoginRequired', True)
+                print(f"DEBUG (login_user): User {email} data: isAdmin={is_user_admin_in_db}, firstLoginRequired={first_login_required}")
+
+                if login_as_admin_attempt and not is_user_admin_in_db:
+                    st.error("This account does not have administrator privileges. Please log in as a regular user.")
+                    print(f"DEBUG (login_user): Admin login attempt for non-admin user {email} denied.")
+                    return False
+                elif not login_as_admin_attempt and is_user_admin_in_db:
+                    st.error("This account has administrator privileges. Please log in as an administrator.")
+                    print(f"DEBUG (login_user): User login attempt for admin user {email} denied.")
+                    return False
+
+                if first_login_required:
+                    st.session_state['new_user_email_for_pw_reset'] = email
+                    st.session_state['new_user_uid_for_pw_reset'] = user_id
+                    st.session_state['current_page'] = 'Update Password'
+                    st.success("Please update your password before proceeding.")
+                    print(f"DEBUG (login_user): Redirecting {email} to password update page.")
+                    time.sleep(1)
+                    st.rerun()
+                    return True
+
                 st.session_state['logged_in'] = True
-                st.session_state['user_email'] = response.user.email
-                # Fetch user's role from your 'users' table
-                user_data = get_user_data(response.user.id)
-                st.session_state['user_role'] = user_data['role'] if user_data and 'role' in user_data else 'candidate' # Default role
-                st.success(f"Welcome, {st.session_state['user_email']}!")
+                st.session_state['user_email'] = email
+                st.session_state['user_name'] = user_data.get('username', email.split('@')[0])
+                st.session_state['user_uid'] = user_id
+                st.session_state['is_admin'] = is_user_admin_in_db
+
+                st.success(f"Logged in as {st.session_state['user_name']}.")
+                if st.session_state['is_admin']:
+                    st.info("You are logged in as an administrator.")
+                print(f"DEBUG (login_user): Successfully logged in {st.session_state['user_name']} (UID: {st.session_state['user_uid']}, Admin: {st.session_state['is_admin']}).")
+
+                time.sleep(1)
+                st.session_state['current_page'] = 'Dashboard'
                 st.rerun()
                 return True
             else:
                 st.error("Invalid email or password.")
                 print(f"DEBUG (login_user): Supabase login failed for {email}. Response: {response}")
                 return False
-    except Exception as e:
-        st.error(f"Login error: {e.message}")
-        print(f"DEBUG (login_user): Supabase API error during login for {email}: {e.message}")
-        return False
-    except Exception as e:
-        st.error(f"An unexpected error occurred during login: {e}")
-        print(f"DEBUG (login_user): Unexpected error during login for {email}: {e}")
+    except Exception as e: # Catching general Exception as APIResponseException import was removed
+        error_message = str(e)
+        st.error(f"An authentication error occurred: {error_message}. Please try again.")
+        print(f"ERROR (login_user): Supabase Auth Error during login for {email}: {error_message}")
+        time.sleep(2)
+        if "Invalid login credentials" in error_message or "Email not confirmed" in error_message:
+            st.error("Invalid email or password, or email not confirmed.")
+        elif "User not found" in error_message:
+            st.error("User not found. Please check your email or sign up.")
+        else:
+            st.error(f"An unexpected error occurred: {error_message}.")
         return False
 
-def register_user(email, password, role='candidate'):
-    supabase = get_supabase_client()
-    try:
-        response = supabase.auth.sign_up({"email": email, "password": password})
-        if response.user:
-            # Save user data to your 'users' table after successful signup
-            user_id = response.user.id
-            user_data = {
-                "id": user_id, # Supabase user ID
-                "email": email,
-                "role": role,
-                "created_at": datetime.now().isoformat()
-            }
-            save_user_data(user_data)
-            st.success("Registration successful! Please check your email to verify your account.")
-            return True
-        else:
-            st.error(f"Registration failed: {response.session}")
-            print(f"DEBUG (register_user): Supabase signup failed for {email}. Response: {response}")
-            return False
-    except Exception as e:
-        st.error(f"Registration error: {e.message}")
-        print(f"DEBUG (register_user): Supabase API error during registration for {email}: {e.message}")
-        return False
-    except Exception as e:
-        st.error(f"An unexpected error occurred during registration: {e}")
-        print(f"DEBUG (register_user): Unexpected error during registration for {email}: {e}")
-        return False
-
-def reset_password(email):
-    supabase = get_supabase_client()
-    try:
-        # Supabase sends a password reset email
-        response = supabase.auth.reset_password_for_email(email)
-        if response: # Supabase's reset_password_for_email doesn't return a user object directly
-            st.success("Password reset email sent. Please check your inbox.")
-            return True
-        else:
-            st.error("Failed to send password reset email. Please try again.")
-            return False
-    except Exception as e:
-        st.error(f"Password reset error: {e.message}")
-        print(f"DEBUG (reset_password): Supabase API error during password reset for {email}: {e.message}")
-        return False
-    except Exception as e:
-        st.error(f"An unexpected error occurred during password reset: {e}")
-        print(f"DEBUG (reset_password): Unexpected error during password reset for {email}: {e}")
-        return False
 
 def logout_user():
-    supabase = get_supabase_client()
+    """Logs out the current user by resetting session state and Supabase session."""
+    print("DEBUG (logout_user): Initiating logout.")
     try:
         supabase.auth.sign_out()
         st.session_state['logged_in'] = False
-        st.session_state['user_email'] = None
-        st.session_state['user_role'] = None
-        st.success("Logged out successfully.")
+        st.session_state['user_name'] = ''
+        st.session_state['user_email'] = ''
+        st.session_state['user_uid'] = ''
+        st.session_state['is_admin'] = False
+        st.session_state['ai_review_result'] = None
+        st.session_state['generated_docx_buffer'] = None
+        st.session_state['review_triggered'] = False
+        st.session_state['current_page'] = 'Login'
+        st.session_state['login_mode'] = None
+        st.session_state['new_user_email_for_pw_reset'] = ''
+        st.session_state['new_user_uid_for_pw_reset'] = ''
+        st.success("Logged out successfully!")
+        print("DEBUG (logout_user): User logged out. Session state reset. Rerunning.")
         st.rerun()
     except Exception as e:
-        st.error(f"Error logging out: {e}")
-        print(f"DEBUG (logout_user): Error during logout: {e}")
+        st.error(f"Error during logout: {e}")
+        print(f"ERROR (logout_user): Error during logout: {e}")
 
-# --- Database Operations (Supabase PostgreSQL) ---
 
-# Generic CRUD for 'users'
-def get_user_data(user_id):
-    supabase = get_supabase_client()
+# --- Supabase Storage & Database Functions ---
+
+def upload_file_to_supabase(file_bytes, file_name, user_uid):
+    """Uploads a file to Supabase Storage and returns its public URL."""
     try:
-        response = supabase.table('users').select('*').eq('id', user_id).single().execute()
-        return response.data
-    except Exception as e:
-        if "PGRST204" in e.message: # No rows found
-            return None
-        st.error(f"Error fetching user data: {e.message}")
-        print(f"DEBUG (get_user_data): Error fetching user {user_id}: {e.message}")
-        return None
-    except Exception as e:
-        st.error(f"An unexpected error occurred while fetching user data: {e}")
-        print(f"DEBUG (get_user_data): Unexpected error fetching user {user_id}: {e}")
-        return None
+        bucket_name = "app_files" # Ensure this bucket exists in your Supabase Storage
+        # Use a unique path for each file, including user_uid for organization
+        file_path_in_storage = f"jd_cv_reports/{user_uid}/{file_name}"
 
-def save_user_data(data):
-    supabase = get_supabase_client()
-    try:
-        # Using upsert to either insert new or update existing based on 'id'
-        response = supabase.table('users').upsert(data).execute()
-        return response.data
-    except Exception as e:
-        st.error(f"Error saving user data: {e}")
-        print(f"DEBUG (save_user_data): Error saving user data: {e}")
-        return None
-
-def update_user_data(user_id, data):
-    supabase = get_supabase_client()
-    try:
-        response = supabase.table('users').update(data).eq('id', user_id).execute()
-        return response.data
-    except Exception as e:
-        st.error(f"Error updating user data: {e}")
-        print(f"DEBUG (update_user_data): Error updating user {user_id}: {e}")
-        return None
-
-def delete_user_data(user_id):
-    supabase = get_supabase_client()
-    try:
-        response = supabase.table('users').delete().eq('id', user_id).execute()
-        return response.data
-    except Exception as e:
-        st.error(f"Error deleting user data: {e}")
-        print(f"DEBUG (delete_user_data): Error deleting user {user_id}: {e}")
-        return None
-
-# Operations for Candidates
-def get_all_candidates():
-    supabase = get_supabase_client()
-    try:
-        response = supabase.table('candidates').select('*').execute()
-        return response.data
-    except Exception as e:
-        st.error(f"Error fetching candidates: {e}")
-        print(f"DEBUG (get_all_candidates): Error fetching candidates: {e}")
-        return []
-
-def get_candidate_by_id(candidate_id):
-    supabase = get_supabase_client()
-    try:
-        response = supabase.table('candidates').select('*').eq('id', candidate_id).single().execute()
-        return response.data
-    except Exception as e:
-        if "PGRST204" in e.message:
-            return None
-        st.error(f"Error fetching candidate: {e.message}")
-        print(f"DEBUG (get_candidate_by_id): Error fetching candidate {candidate_id}: {e.message}")
-        return None
-    except Exception as e:
-        st.error(f"An unexpected error occurred while fetching candidate: {e}")
-        print(f"DEBUG (get_candidate_by_id): Unexpected error fetching candidate {candidate_id}: {e}")
-        return None
-
-def add_candidate_profile(data):
-    supabase = get_supabase_client()
-    try:
-        response = supabase.table('candidates').insert(data).execute()
-        return response.data
-    except Exception as e:
-        st.error(f"Error adding candidate profile: {e}")
-        print(f"DEBUG (add_candidate_profile): Error adding candidate profile: {e}")
-        return None
-
-def update_candidate_profile(candidate_id, data):
-    supabase = get_supabase_client()
-    try:
-        response = supabase.table('candidates').update(data).eq('id', candidate_id).execute()
-        return response.data
-    except Exception as e:
-        st.error(f"Error updating candidate profile: {e}")
-        print(f"DEBUG (update_candidate_profile): Error updating candidate {candidate_id}: {e}")
-        return None
-
-def delete_candidate_profile(candidate_id):
-    supabase = get_supabase_client()
-    try:
-        response = supabase.table('candidates').delete().eq('id', candidate_id).execute()
-        return response.data
-    except Exception as e:
-        st.error(f"Error deleting candidate profile: {e}")
-        print(f"DEBUG (delete_candidate_profile): Error deleting candidate {candidate_id}: {e}")
-        return None
-
-# Operations for Jobs
-def get_all_jobs():
-    supabase = get_supabase_client()
-    try:
-        response = supabase.table('jobs').select('*').execute()
-        return response.data
-    except Exception as e:
-        st.error(f"Error fetching jobs: {e}")
-        print(f"DEBUG (get_all_jobs): Error fetching jobs: {e}")
-        return []
-
-def get_job_by_id(job_id):
-    supabase = get_supabase_client()
-    try:
-        response = supabase.table('jobs').select('*').eq('id', job_id).single().execute()
-        return response.data
-    except Exception as e:
-        if "PGRST204" in e.message:
-            return None
-        st.error(f"Error fetching job: {e.message}")
-        print(f"DEBUG (get_job_by_id): Error fetching job {job_id}: {e.message}")
-        return None
-    except Exception as e:
-        st.error(f"An unexpected error occurred while fetching job: {e}")
-        print(f"DEBUG (get_job_by_id): Unexpected error fetching job {job_id}: {e}")
-        return None
-
-def add_job_posting(data):
-    supabase = get_supabase_client()
-    try:
-        response = supabase.table('jobs').insert(data).execute()
-        return response.data
-    except Exception as e:
-        st.error(f"Error adding job posting: {e}")
-        print(f"DEBUG (add_job_posting): Error adding job posting: {e}")
-        return None
-
-def update_job_posting(job_id, data):
-    supabase = get_supabase_client()
-    try:
-        response = supabase.table('jobs').update(data).eq('id', job_id).execute()
-        return response.data
-    except Exception as e:
-        st.error(f"Error updating job posting: {e}")
-        print(f"DEBUG (update_job_posting): Error updating job {job_id}: {e}")
-        return None
-
-def delete_job_posting(job_id):
-    supabase = get_supabase_client()
-    try:
-        response = supabase.table('jobs').delete().eq('id', job_id).execute()
-        return response.data
-    except Exception as e:
-        st.error(f"Error deleting job posting: {e}")
-        print(f"DEBUG (delete_job_posting): Error deleting job {job_id}: {e}")
-        return None
-
-# Operations for Applications
-def add_application(data):
-    supabase = get_supabase_client()
-    try:
-        response = supabase.table('applications').insert(data).execute()
-        return response.data
-    except Exception as e:
-        st.error(f"Error submitting application: {e}")
-        print(f"DEBUG (add_application): Error submitting application: {e}")
-        return None
-
-def get_applications_by_job_id(job_id):
-    supabase = get_supabase_client()
-    try:
-        response = supabase.table('applications').select('*').eq('job_id', job_id).execute()
-        return response.data
-    except Exception as e:
-        st.error(f"Error fetching applications for job {job_id}: {e}")
-        print(f"DEBUG (get_applications_by_job_id): Error fetching applications for job {job_id}: {e}")
-        return []
-
-def get_applications_by_candidate_id(candidate_id):
-    supabase = get_supabase_client()
-    try:
-        response = supabase.table('applications').select('*').eq('candidate_id', candidate_id).execute()
-        return response.data
-    except Exception as e:
-        st.error(f"Error fetching applications for candidate {candidate_id}: {e}")
-        print(f"DEBUG (get_applications_by_candidate_id): Error fetching applications for candidate {candidate_id}: {e}")
-        return []
-
-def update_application_status(application_id, new_status):
-    supabase = get_supabase_client()
-    try:
-        response = supabase.table('applications').update({"status": new_status}).eq('id', application_id).execute()
-        return response.data
-    except Exception as e:
-        st.error(f"Error updating application status: {e}")
-        print(f"DEBUG (update_application_status): Error updating application {application_id} status to {new_status}: {e}")
-        return None
-
-# --- Storage Operations (Supabase Storage) ---
-def upload_file_to_supabase(bucket_name, file_path_in_storage, file_bytes):
-    supabase = get_supabase_client()
-    try:
+        # Upload the file
         response = supabase.storage.from_(bucket_name).upload(file_path_in_storage, file_bytes)
+
         if response.status_code in [200, 201]: # 200 for existing, 201 for new
+            # Get public URL
             public_url_response = supabase.storage.from_(bucket_name).get_public_url(file_path_in_storage)
             return public_url_response
         else:
-            print(f"DEBUG (upload_file_to_supabase): Supabase upload failed: {response.status_code}, {response.json()}")
+            st.error(f"Supabase Storage upload failed: {response.status_code} - {response.json()}")
+            print(f"ERROR (upload_file_to_supabase): Upload failed: {response.status_code} - {response.json()}")
             return None
     except Exception as e:
-        st.error(f"Error uploading file to storage: {e}")
-        print(f"DEBUG (upload_file_to_supabase): Error uploading file to {bucket_name}/{file_path_in_storage}: {e}")
+        st.error(f"Error uploading file to Supabase Storage: {e}")
+        print(f"ERROR (upload_file_to_supabase): {e}")
         return None
 
-def download_file_from_supabase(bucket_name, file_path_in_storage):
-    supabase = get_supabase_client()
+def delete_file_from_supabase_storage(file_path_in_storage):
+    """Deletes a file from Supabase Storage."""
     try:
-        response = supabase.storage.from_(bucket_name).download(file_path_in_storage)
-        if response:
-            return response # Returns bytes
-        else:
-            print(f"DEBUG (download_file_from_supabase): Supabase download failed for {file_path_in_storage}: No content received.")
-            return None
-    except Exception as e:
-        st.error(f"Error downloading file from storage: {e}")
-        print(f"DEBUG (download_file_from_supabase): Error downloading file from {bucket_name}/{file_path_in_storage}: {e}")
-        return None
-
-def delete_file_from_supabase(bucket_name, file_path_in_storage):
-    supabase = get_supabase_client()
-    try:
+        bucket_name = "app_files"
         response = supabase.storage.from_(bucket_name).remove([file_path_in_storage])
         if response.status_code == 200:
             return True
         else:
-            print(f"DEBUG (delete_file_from_supabase): Supabase delete failed: {response.status_code}, {response.json()}")
+            print(f"ERROR (delete_file_from_supabase_storage): Delete failed: {response.status_code} - {response.json()}")
             return False
     except Exception as e:
-        st.error(f"Error deleting file from storage: {e}")
-        print(f"DEBUG (delete_file_from_supabase): Error deleting file from {bucket_name}/{file_path_in_storage}: {e}")
+        print(f"ERROR (delete_file_from_supabase_storage): {e}")
         return False
 
-# --- AI and Document Processing Functions (No change, as they are independent of backend) ---
+def save_report_on_download(filename, docx_buffer, ai_result, jd_original_name, cv_original_names):
+    """Saves the report to Supabase Storage and 'jd_cv_reports' table metadata."""
+    st.info("Attempting to save report to cloud... (This message will disappear shortly)")
+    print("DEBUG (save_report_on_download): Function started. User UID:", st.session_state.get('user_uid', 'N/A'))
 
-def extract_text_from_pdf(pdf_file):
-    pdf_reader = PdfReader(pdf_file)
-    text = ""
-    for page in pdf_reader.pages:
-        text += page.extract_text() or ""
-    return text
+    if supabase is None:
+        st.error("Application error: Supabase client not available for saving.")
+        print("ERROR (save_report_on_download): Supabase client is None. Cannot save report.")
+        return
 
-def extract_text_from_docx(docx_file):
-    document = Document(docx_file)
-    text = ""
-    for paragraph in document.paragraphs:
-        text += paragraph.text + "\n"
-    return text
+    storage_file_path = f"jd_cv_reports/{st.session_state['user_uid']}/{filename}"
+    download_url = None
 
-def generate_resume_summary(resume_text):
-    if not client_openai:
-        st.warning("OpenAI client not initialized. Cannot generate summary.")
-        return "AI features are disabled."
     try:
-        response = client_openai.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are an AI assistant that summarizes resumes."},
-                {"role": "user", "content": f"Summarize the following resume text:\n\n{resume_text}"}
-            ],
-            max_tokens=200
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        st.error(f"Error generating resume summary: {e}")
-        return "Error generating summary."
+        print(f"DEBUG (save_report_on_download): Attempting to upload file to Storage at: {storage_file_path}")
+        docx_buffer.seek(0)
+        file_bytes = docx_buffer.getvalue()
+        download_url = upload_file_to_supabase(file_bytes, filename, st.session_state['user_uid'])
 
-def generate_job_description_summary(job_description_text):
-    if not client_openai:
-        st.warning("OpenAI client not initialized. Cannot generate summary.")
-        return "AI features are disabled."
-    try:
-        response = client_openai.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are an AI assistant that summarizes job descriptions."},
-                {"role": "user", "content": f"Summarize the following job description:\n\n{job_description_text}"}
-            ],
-            max_tokens=200
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        st.error(f"Error generating job description summary: {e}")
-        return "Error generating summary."
+        if download_url:
+            st.success(f"File uploaded to Supabase Storage successfully! URL: {download_url}")
+            print(f"DEBUG (save_report_on_download): File uploaded to Storage. Public URL: {download_url}")
 
-def match_resume_to_job(resume_text, job_description_text):
-    if not client_openai:
-        st.warning("OpenAI client not initialized. Cannot perform matching.")
-        return "AI features are disabled."
-    try:
-        response = client_openai.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are an AI assistant that matches resumes to job descriptions and provides a match percentage and key reasons."},
-                {"role": "user", "content": f"Given the following resume and job description, provide a match percentage and key reasons for the match. Focus on skills, experience, and qualifications.\n\nResume:\n{resume_text}\n\nJob Description:\n{job_description_text}"}
-            ],
-            max_tokens=500
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        st.error(f"Error matching resume to job: {e}")
-        return "Error performing match."
+            report_metadata = {
+                "user_email": st.session_state['user_email'],
+                "user_name": st.session_state['user_name'],
+                "user_uid": st.session_state['user_uid'],
+                "jd_filename": jd_original_name,
+                "cv_filenames": json.dumps(cv_original_names), # Store list as JSON string
+                "review_date": datetime.now().isoformat(), # Use ISO format for Supabase timestamp
+                "outputDocFileName": filename,
+                "outputDocURL": download_url,
+                "summary": ai_result.get("final_shortlist_recommendation", "No summary provided.")
+            }
+            print(f"DEBUG (save_report_on_download): Prepared Supabase table metadata: {report_metadata}")
 
-# --- Streamlit UI Pages ---
-
-def show_home_page():
-    st.markdown("<h1 class='main-title'>Welcome to SSO Consultants AI Recruitment</h1>", unsafe_allow_html=True)
-    st.markdown("<p class='sub-header'>Your intelligent partner for seamless hiring.</p>", unsafe_allow_html=True)
-
-    st.image("https://placehold.co/600x300/FF8C00/FFFFFF?text=SSO+Consultants+AI", use_column_width=True)
-
-    st.markdown("""
-        <div style="background-color: #F9F9F9; padding: 20px; border-radius: 10px; margin-top: 30px;">
-            <h3 style="color: #FF8C00;">About Us</h3>
-            <p style="color: #000000;">
-                SSO Consultants leverages cutting-edge AI to revolutionize the recruitment process.
-                From intelligent resume parsing to precise job matching and streamlined application management,
-                we empower recruiters to find the perfect candidates faster and candidates to discover their dream jobs.
-            </p>
-            <h3 style="color: #FF8C00; margin-top: 20px;">Our Features</h3>
-            <ul style="color: #000000;">
-                <li>AI-powered resume analysis and summarization.</li>
-                <li>Intelligent job description generation and summarization.</li>
-                <li>Automated resume-to-job matching with detailed insights.</li>
-                <li>Comprehensive candidate and job posting management.</li>
-                <li>Streamlined application tracking and status updates.</li>
-            </ul>
-        </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("<p class='powered-by'>Powered by Supabase & OpenAI</p>", unsafe_allow_html=True)
-
-
-def show_recruiter_dashboard():
-    st.markdown("<h2 style='text-align: center; color: #FF8C00;'>Recruiter Dashboard</h2>", unsafe_allow_html=True)
-    st.write(f"Welcome, {st.session_state['user_email']} ({st.session_state['user_role']})!")
-
-    tab1, tab2, tab3 = st.tabs(["Manage Job Postings", "View Candidates", "Manage Applications"])
-
-    with tab1:
-        st.subheader("Manage Job Postings")
-        jobs = get_all_jobs()
-        if st.button("Add New Job Posting", key="add_job_btn"):
-            st.session_state['current_page'] = 'add_job'
-            st.rerun()
-
-        if jobs:
-            df_jobs = pd.DataFrame(jobs)
-            st.dataframe(df_jobs, use_container_width=True)
-
-            col_edit, col_delete = st.columns(2)
-            with col_edit:
-                job_id_to_edit = st.text_input("Enter Job ID to Edit:")
-                if st.button("Edit Job", key="edit_job_btn") and job_id_to_edit:
-                    job_to_edit = get_job_by_id(job_id_to_edit)
-                    if job_to_edit:
-                        st.session_state['job_to_edit'] = job_to_edit
-                        st.session_state['current_page'] = 'edit_job'
-                        st.rerun()
-                    else:
-                        st.error("Job not found.")
-            with col_delete:
-                job_id_to_delete = st.text_input("Enter Job ID to Delete:")
-                if st.button("Delete Job", key="delete_job_btn") and job_id_to_delete:
-                    if delete_job_posting(job_id_to_delete):
-                        st.success("Job deleted successfully.")
-                        st.rerun()
-                    else:
-                        st.error("Failed to delete job.")
-        else:
-            st.info("No job postings available. Add one!")
-
-    with tab2:
-        st.subheader("View All Candidates")
-        candidates = get_all_candidates()
-        if candidates:
-            df_candidates = pd.DataFrame(candidates)
-            st.dataframe(df_candidates, use_container_width=True)
-
-            candidate_id_to_view = st.text_input("Enter Candidate ID to View Profile:")
-            if st.button("View Candidate Profile", key="view_candidate_btn") and candidate_id_to_view:
-                candidate_profile = get_candidate_by_id(candidate_id_to_view)
-                if candidate_profile:
-                    st.session_state['candidate_to_view'] = candidate_profile
-                    st.session_state['current_page'] = 'view_candidate_profile'
-                    st.rerun()
+            try:
+                print("DEBUG (save_report_on_download): About to attempt saving metadata to Supabase table 'jd_cv_reports'...")
+                response = supabase.table('jd_cv_reports').insert(report_metadata).execute()
+                if response.data:
+                    st.success("Report metadata saved to Supabase successfully!")
+                    print("DEBUG (save_report_on_download): Report metadata successfully added to Supabase.")
                 else:
-                    st.error("Candidate not found.")
+                    st.error(f"Supabase metadata save failed: {response.json()}")
+                    print(f"ERROR (save_report_on_download): Supabase metadata save failed: {response.json()}")
+                    if download_url:
+                        # Attempt to delete file from storage if metadata save fails
+                        delete_file_from_supabase_storage(storage_file_path)
+                        print("DEBUG: Deleted file from Storage due to metadata save failure.")
+
+            except Exception as generic_e: # Catching general Exception
+                st.error(f"An unexpected error occurred during Supabase metadata save: {generic_e}.")
+                print(f"ERROR (save_report_on_download): Generic error during Supabase metadata save: {generic_e}")
+                if download_url:
+                    # Attempt to delete file from storage if metadata save fails
+                    delete_file_from_supabase_storage(storage_file_path)
+                    print("DEBUG: Deleted file from Storage due to generic metadata save failure.")
         else:
-            st.info("No candidate profiles available.")
+            st.error("File upload to Supabase Storage failed, so metadata was not saved.")
 
-    with tab3:
-        st.subheader("Manage Job Applications")
-        jobs_for_applications = get_all_jobs()
-        if jobs_for_applications:
-            job_titles = {job['id']: job['title'] for job in jobs_for_applications}
-            selected_job_id = st.selectbox("Select a Job to View Applications:", options=list(job_titles.keys()), format_func=lambda x: job_titles[x])
+    except Exception as e: # Catching general Exception
+        st.error(f"Error during report upload or initial setup: {e}")
+        print(f"ERROR (save_report_on_download): Overall error in function (Storage upload or initial setup): {e}")
 
-            if selected_job_id:
-                applications = get_applications_by_job_id(selected_job_id)
-                if applications:
-                    st.write(f"Applications for: **{job_titles[selected_job_id]}**")
-                    for app in applications:
-                        candidate_info = get_candidate_by_id(app['candidate_id'])
-                        candidate_name = candidate_info['name'] if candidate_info else "N/A"
-                        st.markdown(f"""
-                            <div style="border: 1px solid #E0E0E0; border-radius: 8px; padding: 15px; margin-bottom: 10px; background-color: #FFFFFF;">
-                                <p><strong>Candidate:</strong> {candidate_name}</p>
-                                <p><strong>Applied On:</strong> {app['applied_date']}</p>
-                                <p><strong>Status:</strong> <span class='status-badge status-{app['status']}'>{app['status']}</span></p>
-                                <p><strong>Resume URL:</strong> <a href="{app['resume_url']}" target="_blank" style="color: #FF8C00;">View Resume</a></p>
-                            </div>
-                        """, unsafe_allow_html=True)
-                        new_status = st.selectbox(
-                            f"Update status for {candidate_name} (Application ID: {app['id']}):",
-                            options=["Pending", "Reviewed", "Interview", "Rejected", "Hired"],
-                            index=["Pending", "Reviewed", "Interview", "Rejected", "Hired"].index(app['status']),
-                            key=f"status_select_{app['id']}"
-                        )
-                        if st.button(f"Update Status for {candidate_name}", key=f"update_status_btn_{app['id']}"):
-                            if update_application_status(app['id'], new_status):
-                                st.success(f"Status updated to {new_status} for {candidate_name}.")
-                                st.rerun()
+    finally:
+        pass
+
+def review_reports_page():
+    """Displays a table of past reports fetched from Supabase for the current user."""
+    st.markdown("<h1 style='color: #0D47A1 !important;'>📚 Review Your Past Reports</h1>", unsafe_allow_html=True)
+    st.write("Here you can find a history of your AI-generated comparative analysis reports.")
+    print("DEBUG (review_reports_page): Displaying review reports page.")
+
+    if not st.session_state['logged_in'] or not st.session_state['user_uid'] or supabase is None:
+        st.info("Please log in to view your past reports.")
+        if supabase is None:
+            print("ERROR: review_reports_page called but 'supabase' is None.")
+        else:
+            print("DEBUG (review_reports_page): User not logged in, cannot fetch reports.")
+        return
+
+    try:
+        print(f"DEBUG (review_reports_page): Fetching reports for UID: {st.session_state['user_uid']}")
+        # Querying reports for the current user, ordered by review_date
+        # Supabase doesn't have direct 'order_by' on the Python client for all queries like Firestore
+        # You fetch and then sort, or rely on RLS and database views/functions if complex.
+        # For simple cases, you can sort after fetching.
+        response = supabase.table('jd_cv_reports').select('*').eq('user_uid', st.session_state['user_uid']).execute()
+        reviews_data = response.data if response.data else []
+
+        # Sort by review_date in descending order (assuming review_date is ISO format string)
+        reviews_data.sort(key=lambda x: x.get('review_date', ''), reverse=True)
+
+        processed_reviews_data = []
+        for report in reviews_data:
+            cv_filenames = json.loads(report.get('cv_filenames', '[]')) if isinstance(report.get('cv_filenames'), str) else report.get('cv_filenames', [])
+            processed_reviews_data.append({
+                "Report ID": report.get('id', 'N/A'), # Assuming 'id' is the primary key in Supabase table
+                "Report Name": report.get('outputDocFileName', 'N/A'),
+                "Job Description": report.get('jd_filename', 'N/A'),
+                "Candidates": ", ".join(cv_filenames),
+                "Date Generated": datetime.fromisoformat(report['review_date']).strftime('%Y-%m-%d %H:%M:%S') if report.get('review_date') else 'N/A',
+                "Summary": report.get('summary', 'No summary provided.'),
+                "Download Link": report.get('outputDocURL', '')
+            })
+
+        if processed_reviews_data:
+            print(f"DEBUG (review_reports_page): Found {len(processed_reviews_data)} reports.")
+            df = pd.DataFrame(processed_reviews_data)
+            st.dataframe(df,
+                         column_config={
+                             "Download Link": st.column_config.LinkColumn("Download File", display_text="⬇️ Download", help="Click to download the report file")
+                         },
+                         hide_index=True,
+                         use_container_width=True)
+        else:
+            st.info("No reports found yet for your account. Start by uploading JD & CVs!")
+            print("DEBUG (review_reports_page): No reports found for this user.")
+    except Exception as e: # Catching general Exception
+        st.error(f"Error fetching your review reports: {e}")
+        print(f"ERROR (review_reports_page): Error fetching reports: {e}")
+
+
+# --- Admin Pages ---
+def admin_dashboard_page():
+    """Admin dashboard overview."""
+    st.markdown("<h1 style='color: #0D47A1 !important;'>⚙️ Admin Dashboard</h1>", unsafe_allow_html=True)
+    st.write("Welcome to the Admin Panel. From here you can manage users and all generated reports.")
+    st.info("Use the sidebar navigation to access User Management, Report Management, or Invite New Member.")
+    print("DEBUG (admin_dashboard_page): Displaying admin dashboard.")
+
+def admin_user_management_page():
+    """Admin page to manage users."""
+    st.markdown("<h1 style='color: #0D47A1 !important;'>👥 Admin: User Management</h1>", unsafe_allow_html=True)
+    st.write("View, manage roles, or delete users.")
+    print("DEBUG (admin_user_management_page): Displaying user management page.")
+
+    if supabase is None:
+        print("ERROR: admin_user_management_page called but 'supabase' is None.")
+        st.error("Application error: Database connection not established. Please refresh or contact support.")
+        return
+
+    users_data = []
+    try:
+        print(f"DEBUG (admin_user_management_page): Fetching all users from Supabase 'users' table.")
+        response = supabase.table('users').select('*').execute()
+        users_from_db = response.data if response.data else []
+
+        for user_info in users_from_db:
+            users_data.append({
+                "UID": user_info.get('id', 'N/A'),
+                "Username": user_info.get('username', 'N/A'),
+                "Email": user_info.get('email', 'N/A'),
+                "Is Admin": user_info.get('isAdmin', False)
+            })
+
+        if users_data:
+            print(f"DEBUG (admin_user_management_page): Found {len(users_data)} users.")
+            df_users = pd.DataFrame(users_data)
+            st.dataframe(df_users, use_container_width=True, hide_index=True)
+
+            st.markdown("---")
+            st.markdown("<h3 style='color: #0D47A1 !important;'>Manage User Actions</h3>", unsafe_allow_html=True)
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.markdown("<h5 style='color: #0D47A1 !important;'>Toggle Admin Status</h5>", unsafe_allow_html=True)
+                user_email_toggle = st.text_input("User Email to Toggle Admin", key="toggle_admin_email")
+                if st.button("Toggle Admin Status", key="toggle_admin_button"):
+                    if user_email_toggle:
+                        try:
+                            print(f"DEBUG (admin_user_management_page): Toggling admin status for {user_email_toggle}.")
+                            # Fetch user from Supabase Auth to get UID
+                            auth_user_response = supabase.auth.admin.get_user_by_email(user_email_toggle)
+                            user_record = auth_user_response.user
+
+                            if user_record:
+                                # Fetch user data from 'users' table
+                                user_data_response = supabase.table('users').select('isAdmin').eq('id', user_record.id).single().execute()
+                                user_data = user_data_response.data if user_data_response.data else {}
+                                current_admin_status = user_data.get('isAdmin', False)
+
+                                if user_record.id == st.session_state['user_uid'] and current_admin_status:
+                                    st.error("You cannot revoke your own administrator privileges.")
+                                    print("DEBUG (admin_user_management_page): Self-revocation attempt blocked.")
+                                else:
+                                    # Update 'isAdmin' in the 'users' table
+                                    supabase.table('users').update({'isAdmin': not current_admin_status}).eq('id', user_record.id).execute()
+                                    st.success(f"Admin status for {user_email_toggle} toggled to {not current_admin_status}.")
+                                    print(f"DEBUG (admin_user_management_page): Admin status for {user_email_toggle} set to {not current_admin_status}.")
+                                    time.sleep(1)
+                                    st.rerun()
                             else:
-                                st.error("Failed to update status.")
-                        st.markdown("---")
+                                st.error("User not found in Supabase Auth.")
+                                print(f"ERROR (admin_user_management_page): User {user_email_toggle} not found in Supabase Auth.")
+                        except Exception as e: # Catching general Exception
+                            st.error(f"Error toggling admin status: {e}")
+                            print(f"ERROR (admin_user_management_page): Error toggling: {e}")
+                    else:
+                        st.warning("Please enter a user email to toggle admin status.")
+
+            with col2:
+                st.markdown("<h5 style='color: #0D47A1 !important;'>Delete User</h5>", unsafe_allow_html=True)
+                user_email_delete = st.text_input("User Email to Delete", key="delete_user_email")
+                if st.button("Delete User", key="delete_user_button"):
+                    if user_email_delete:
+                        if user_email_delete == st.session_state['user_email']:
+                            st.error("You cannot delete your own admin account!")
+                            print("DEBUG (admin_user_management_page): Self-deletion attempt blocked.")
+                        else:
+                            try:
+                                print(f"DEBUG (admin_user_management_page): Deleting user {user_email_delete}.")
+                                # Get user UID from Supabase Auth
+                                auth_user_response = supabase.auth.admin.get_user_by_email(user_email_delete)
+                                user_record = auth_user_response.user
+                                user_uid_to_delete = user_record.id
+
+                                # 1. Delete associated files from Storage
+                                # Need to fetch reports first to get file paths
+                                reports_response = supabase.table('jd_cv_reports').select('outputDocFileName').eq('user_uid', user_uid_to_delete).execute()
+                                if reports_response.data:
+                                    for report_data in reports_response.data:
+                                        storage_file_path = f"jd_cv_reports/{user_uid_to_delete}/{report_data['outputDocFileName']}"
+                                        if delete_file_from_supabase_storage(storage_file_path):
+                                            print(f"DEBUG (admin_user_management_page): Deleted Storage file: {storage_file_path}.")
+                                        else:
+                                            st.warning(f"Could not delete storage file for {user_email_delete}: {report_data['outputDocFileName']}.")
+
+                                # 2. Delete reports from 'jd_cv_reports' table
+                                supabase.table('jd_cv_reports').delete().eq('user_uid', user_uid_to_delete).execute()
+                                print(f"DEBUG (admin_user_management_page): Deleted reports for user {user_email_delete} from 'jd_cv_reports' table.")
+
+                                # 3. Delete user from 'users' table
+                                supabase.table('users').delete().eq('id', user_uid_to_delete).execute()
+                                print(f"DEBUG (admin_user_management_page): Deleted user {user_email_delete} from 'users' table.")
+
+                                # 4. Delete user from Supabase Auth
+                                supabase.auth.admin.delete_user(user_uid_to_delete)
+                                st.success(f"User {user_email_delete} and all their associated data deleted successfully.")
+                                print(f"DEBUG (admin_user_management_page): User {user_email_delete} fully deleted.")
+                                time.sleep(1)
+                                st.rerun()
+                            except Exception as e: # Catching general Exception
+                                st.error(f"Error deleting user: {e}")
+                                print(f"ERROR (admin_user_management_page): Error deleting user: {e}")
+                    else:
+                        st.warning("Please enter a user email to delete.")
+
+        else:
+            st.info("No users registered yet or error fetching users.")
+            print("DEBUG (admin_user_management_page): No users found or fetch error.")
+
+    except Exception as e:
+        st.error(f"Error fetching users for admin management: {e}")
+        print(f"ERROR (admin_user_management_page): Error fetching users for admin management: {e}")
+
+
+def admin_report_management_page():
+    """Admin page to manage all reports."""
+    st.markdown("<h1 style='color: #0D47A1 !important;'>📊 Admin: Report Management</h1>", unsafe_allow_html=True)
+    st.write("View and delete all AI-generated comparative analysis reports.")
+    print("DEBUG (admin_report_management_page): Displaying report management page.")
+
+    if supabase is None:
+        print("ERROR: admin_report_management_page called but 'supabase' is None.")
+        st.error("Application error: Database connection not established. Please refresh or contact support.")
+        return
+
+    all_reports_data = []
+    try:
+        print(f"DEBUG (admin_report_management_page): Fetching all reports from Supabase 'jd_cv_reports' table.")
+        # Fetching all reports, then sort by review_date in descending order
+        response = supabase.table('jd_cv_reports').select('*').execute()
+        all_reports_raw = response.data if response.data else []
+        all_reports_raw.sort(key=lambda x: x.get('review_date', ''), reverse=True)
+
+        for report_info in all_reports_raw:
+            cv_filenames = json.loads(report_info.get('cv_filenames', '[]')) if isinstance(report_info.get('cv_filenames'), str) else report_info.get('cv_filenames', [])
+            all_reports_data.append({
+                "Report ID": report_info.get('id', 'N/A'),
+                "Report Name": report_info.get('outputDocFileName', 'N/A'),
+                "Uploaded By": report_info.get('user_name', 'N/A'),
+                "Uploader Email": report_info.get('user_email', 'N/A'),
+                "JD Filename": report_info.get('jd_filename', 'N/A'),
+                "CV Filenames": ", ".join(cv_filenames),
+                "Date Generated": datetime.fromisoformat(report_info['review_date']).strftime('%Y-%m-%d %H:%M:%S') if report_info.get('review_date') else 'N/A',
+                "Summary": report_info.get('summary', 'No summary provided.'),
+                "Download Link": report_info.get('outputDocURL', '')
+            })
+
+        if all_reports_data:
+            print(f"DEBUG (admin_report_management_page): Found {len(all_reports_data)} reports.")
+            df = pd.DataFrame(all_reports_data)
+            st.dataframe(df,
+                         column_config={
+                             "Download Link": st.column_config.LinkColumn("Download File", display_text="⬇️ Download", help="Click to download the report file")
+                         },
+                         hide_index=True,
+                         use_container_width=True)
+
+            st.markdown("---")
+            st.markdown("<h3 style='color: #0D47A1 !important;'>Delete Report</h3>", unsafe_allow_html=True)
+            report_id_to_delete = st.text_input("Enter Report ID to Delete (from table above)", key="delete_report_id")
+
+            if st.button("Delete Report", key="delete_report_button"):
+                if report_id_to_delete:
+                    try:
+                        print(f"DEBUG (admin_report_management_page): Deleting report {report_id_to_delete}.")
+                        report_response = supabase.table('jd_cv_reports').select('outputDocFileName', 'user_uid').eq('id', report_id_to_delete).single().execute()
+                        report_data = report_response.data if report_response.data else None
+
+                        if report_data:
+                            storage_file_path = f"jd_cv_reports/{report_data['user_uid']}/{report_data['outputDocFileName']}"
+
+                            if delete_file_from_supabase_storage(storage_file_path):
+                                st.success(f"File '{report_data['outputDocFileName']}' deleted from Storage.")
+                                print(f"DEBUG (admin_report_management_page): Deleted Storage file: {storage_file_path}.")
+                            else:
+                                st.warning(f"Could not delete storage file for report ID {report_id_to_delete}.")
+
+                            response = supabase.table('jd_cv_reports').delete().eq('id', report_id_to_delete).execute()
+                            if response.data:
+                                st.success(f"Report '{report_id_to_delete}' deleted from Supabase table.")
+                                print(f"DEBUG (admin_report_management_page): Deleted Supabase table document: {report_id_to_delete}.")
+                            else:
+                                st.error(f"Failed to delete report from Supabase table: {response.json()}")
+                                print(f"ERROR (admin_report_management_page): Supabase table deletion failed: {response.json()}")
+
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("Report with this ID not found.")
+                            print(f"ERROR (admin_report_management_page): Report {report_id_to_delete} not found.")
+                    except Exception as e: # Catching general Exception
+                        st.error(f"Error deleting report: {e}. Ensure Storage path is correct and rules allow deletion.")
+                        print(f"ERROR (admin_report_management_page): Error during report deletion for {report_id_to_delete}: {e}")
                 else:
-                    st.info("No applications for this job yet.")
+                    st.warning("Please enter a Report ID to delete.")
+
         else:
-            st.info("No jobs available to view applications for.")
+            st.info("No reports found in the database.")
+            print("DEBUG (admin_report_management_page): No reports found in database.")
 
+    except Exception as e: # Catching general Exception
+        st.error(f"Error fetching all reports for admin management: {e}")
+        print(f"ERROR (admin_report_management_page): Error fetching all reports: {e}")
 
-def show_candidate_dashboard():
-    st.markdown("<h2 style='text-align: center; color: #FF8C00;'>Candidate Dashboard</h2>", unsafe_allow_html=True)
-    st.write(f"Welcome, {st.session_state['user_email']} ({st.session_state['user_role']})!")
+def admin_invite_member_page():
+    """Admin page to invite and create new user accounts."""
+    st.markdown("<h1 style='color: #0D47A1 !important;'>➕ Admin: Invite New Member</h1>", unsafe_allow_html=True)
+    st.write("Create new user accounts directly and assign their initial role.")
+    print("DEBUG (admin_invite_member_page): Displaying invite member page.")
 
-    tab1, tab2, tab3 = st.tabs(["My Profile", "Browse Jobs", "My Applications"])
+    if supabase is None:
+        print("ERROR: admin_invite_member_page called but 'supabase' is None.")
+        st.error("Application error: Database connection not established. Please refresh or contact support.")
+        return
 
-    with tab1:
-        st.subheader("My Profile")
-        user_id = supabase.auth.get_user().user.id # Get current Supabase user ID
-        candidate_profile = get_candidate_by_id(user_id) # Assuming candidate ID is same as user ID
+    status_message_placeholder = st.empty()
 
-        if candidate_profile:
-            st.write(f"**Name:** {candidate_profile.get('name', 'N/A')}")
-            st.write(f"**Email:** {candidate_profile.get('email', 'N/A')}")
-            st.write(f"**Skills:** {candidate_profile.get('skills', 'N/A')}")
-            st.write(f"**Experience:** {candidate_profile.get('experience', 'N/A')}")
-            if candidate_profile.get('resume_url'):
-                st.markdown(f"**Resume:** [View Resume]({candidate_profile['resume_url']})", unsafe_allow_html=True)
+    with st.form("invite_member_form"):
+        new_user_email_input = st.text_input("New User Email", help="The email address for the new account.", key="invite_email")
+        new_username_input = st.text_input("New User Username", help="A display name for the new user.", key="invite_username")
+        new_user_password_input = st.text_input("Temporary Password", type="password", help="A temporary password for the new user. Please communicate this to them securely.", key="invite_password")
 
-            if st.button("Edit Profile", key="edit_candidate_profile_btn"):
-                st.session_state['candidate_to_edit'] = candidate_profile
-                st.session_state['current_page'] = 'edit_candidate_profile'
-                st.rerun()
-        else:
-            st.info("You don't have a candidate profile yet. Create one!")
-            if st.button("Create Profile", key="create_candidate_profile_btn"):
-                st.session_state['current_page'] = 'create_candidate_profile'
-                st.rerun()
+        assign_role = st.radio(
+            "Assign Role:",
+            ("User", "Admin"),
+            index=0,
+            key="assign_role_radio"
+        )
 
-    with tab2:
-        st.subheader("Browse Available Jobs")
-        jobs = get_all_jobs()
-        if jobs:
-            for job in jobs:
-                with st.expander(f"**{job['title']}** at {job['company']}"):
-                    st.write(f"**Location:** {job['location']}")
-                    st.write(f"**Salary:** {job['salary']}")
-                    st.write(f"**Description:** {job['description']}")
-                    st.write(f"**Requirements:** {job['requirements']}")
-                    st.write(f"**Posted On:** {job['posted_date']}")
+        is_admin_new_user = (assign_role == "Admin")
 
-                    if st.button(f"Apply for {job['title']}", key=f"apply_job_{job['id']}"):
-                        st.session_state['job_to_apply'] = job
-                        st.session_state['current_page'] = 'apply_for_job'
+        confirm_admin_invite = True
+        if is_admin_new_user:
+            status_message_placeholder.warning("You are about to invite a new Administrator. Administrators have full control over users and reports.")
+            confirm_admin_invite = st.checkbox("Yes, I understand and want to create an Administrator account.", key="confirm_admin_invite")
+
+        submit_invite_button = st.form_submit_button("Invite New Member")
+
+        if submit_invite_button:
+            print("DEBUG (admin_invite_member_page): 'Invite New Member' button clicked.")
+            if is_admin_new_user and not confirm_admin_invite:
+                status_message_placeholder.error("Please confirm to create an Administrator account by checking the box.")
+                print("DEBUG (admin_invite_member_page): Admin invite: checkbox not confirmed.")
+                return
+
+            if not (new_user_email_input and new_username_input and new_user_password_input):
+                status_message_placeholder.warning("Please fill in all fields (Email, Username, Temporary Password).")
+                print("DEBUG (admin_invite_member_page): Admin invite: missing fields.")
+                return
+
+            if not re.match(r"[^@]+@[^@]+\.[^@]+", new_user_email_input):
+                status_message_placeholder.warning("Please enter a valid email address.")
+                print("DEBUG (admin_invite_member_page): Admin invite: invalid email format.")
+                return
+
+            if len(new_user_password_input) < 6:
+                status_message_placeholder.warning("Temporary password should be at least 6 characters long (Supabase minimum).")
+                print("DEBUG (admin_invite_member_page): Admin invite: weak password.")
+                return
+
+            try:
+                with st.spinner("Inviting new member..."):
+                    print(f"DEBUG (admin_invite_member_page): Attempting to create user {new_user_email_input} with role {assign_role}.")
+                    # Create user in Supabase Auth
+                    response = supabase.auth.admin.create_user(
+                        {"email": new_user_email_input, "password": new_user_password_input, "email_confirm": True} # Set email_confirm to True for verification
+                    )
+                    user_record = response.user
+
+                    if user_record:
+                        # Save user profile in 'users' table
+                        user_data = {
+                            'id': user_record.id,
+                            'email': new_user_email_input,
+                            'username': new_username_input,
+                            'created_at': datetime.now().isoformat(),
+                            'isAdmin': is_admin_new_user,
+                            'firstLoginRequired': True
+                        }
+                        supabase.table('users').insert(user_data).execute()
+
+                        status_message_placeholder.success(f"New user '{new_username_input}' ({new_user_email_input}) created successfully with role: {assign_role}! They will need to verify their email.")
+                        print(f"DEBUG (admin_invite_member_page): User {new_user_email_input} created in Auth and 'users' table.")
+
+                        st.session_state['invite_email'] = ""
+                        st.session_state['invite_username'] = ""
+                        st.session_state['invite_password'] = ""
+                        st.session_state['assign_role_radio'] = "User"
+                        if 'confirm_admin_invite' in st.session_state:
+                            st.session_state['confirm_admin_invite'] = False
+
+                        time.sleep(2)
                         st.rerun()
-                    st.markdown("---")
-        else:
-            st.info("No jobs available at the moment. Check back later!")
-
-    with tab3:
-        st.subheader("My Applications")
-        user_id = supabase.auth.get_user().user.id
-        my_applications = get_applications_by_candidate_id(user_id)
-
-        if my_applications:
-            for app in my_applications:
-                job_info = get_job_by_id(app['job_id'])
-                job_title = job_info['title'] if job_info else "N/A"
-                st.markdown(f"""
-                    <div style="border: 1px solid #E0E0E0; border-radius: 8px; padding: 15px; margin-bottom: 10px; background-color: #FFFFFF;">
-                        <p><strong>Job Title:</strong> {job_title}</p>
-                        <p><strong>Applied On:</strong> {app['applied_date']}</p>
-                        <p><strong>Status:</strong> <span class='status-badge status-{app['status']}'>{app['status']}</span></p>
-                        <p><strong>Resume Used:</strong> <a href="{app['resume_url']}" target="_blank" style="color: #FF8C00;">View Resume</a></p>
-                    </div>
-                """, unsafe_allow_html=True)
-                st.markdown("---")
-        else:
-            st.info("You haven't applied for any jobs yet.")
-
-def show_add_job_page():
-    st.markdown("<h2 style='text-align: center; color: #FF8C00;'>Add New Job Posting</h2>", unsafe_allow_html=True)
-    with st.form("add_job_form"):
-        title = st.text_input("Job Title", placeholder="e.g., Senior Software Engineer")
-        company = st.text_input("Company Name", placeholder="e.g., Tech Solutions Inc.")
-        location = st.text_input("Location", placeholder="e.g., Remote, New York, London")
-        salary = st.text_input("Salary", placeholder="e.g., $100,000 - $150,000 annually")
-        description = st.text_area("Job Description", height=200, placeholder="Provide a detailed description of the role.")
-        requirements = st.text_area("Key Requirements", height=150, placeholder="List essential skills and qualifications.")
-        posted_date = st.date_input("Posted Date", datetime.now().date())
-
-        submit_button = st.form_submit_button("Add Job")
-
-        if submit_button:
-            if title and company and description and requirements:
-                job_data = {
-                    "title": title,
-                    "company": company,
-                    "location": location,
-                    "salary": salary,
-                    "description": description,
-                    "requirements": requirements,
-                    "posted_date": posted_date.isoformat(),
-                    "created_by": st.session_state['user_email'] # Store who created it
-                }
-                if add_job_posting(job_data):
-                    st.success("Job posting added successfully!")
-                    st.session_state['current_page'] = 'recruiter_dashboard'
-                    st.rerun()
-                else:
-                    st.error("Failed to add job posting.")
-            else:
-                st.warning("Please fill in all required fields (Title, Company, Description, Requirements).")
-    if st.button("Back to Dashboard", key="back_to_recruiter_dashboard_from_add_job"):
-        st.session_state['current_page'] = 'recruiter_dashboard'
-        st.rerun()
-
-def show_edit_job_page():
-    st.markdown("<h2 style='text-align: center; color: #FF8C00;'>Edit Job Posting</h2>", unsafe_allow_html=True)
-    job_to_edit = st.session_state.get('job_to_edit')
-    if not job_to_edit:
-        st.error("No job selected for editing.")
-        if st.button("Back to Dashboard", key="back_to_recruiter_dashboard_from_edit_job_no_job"):
-            st.session_state['current_page'] = 'recruiter_dashboard'
-            st.rerun()
-        return
-
-    with st.form("edit_job_form"):
-        st.write(f"Editing Job ID: **{job_to_edit['id']}**")
-        title = st.text_input("Job Title", value=job_to_edit.get('title', ''))
-        company = st.text_input("Company Name", value=job_to_edit.get('company', ''))
-        location = st.text_input("Location", value=job_to_edit.get('location', ''))
-        salary = st.text_input("Salary", value=job_to_edit.get('salary', ''))
-        description = st.text_area("Job Description", value=job_to_edit.get('description', ''), height=200)
-        requirements = st.text_area("Key Requirements", value=job_to_edit.get('requirements', ''), height=150)
-        posted_date_str = job_to_edit.get('posted_date', datetime.now().isoformat())
-        posted_date = st.date_input("Posted Date", value=datetime.fromisoformat(posted_date_str).date())
-
-        submit_button = st.form_submit_button("Update Job")
-
-        if submit_button:
-            if title and company and description and requirements:
-                updated_data = {
-                    "title": title,
-                    "company": company,
-                    "location": location,
-                    "salary": salary,
-                    "description": description,
-                    "requirements": requirements,
-                    "posted_date": posted_date.isoformat()
-                }
-                if update_job_posting(job_to_edit['id'], updated_data):
-                    st.success("Job posting updated successfully!")
-                    del st.session_state['job_to_edit']
-                    st.session_state['current_page'] = 'recruiter_dashboard'
-                    st.rerun()
-                else:
-                    st.error("Failed to update job posting.")
-            else:
-                st.warning("Please fill in all required fields.")
-    if st.button("Back to Dashboard", key="back_to_recruiter_dashboard_from_edit_job"):
-        del st.session_state['job_to_edit']
-        st.session_state['current_page'] = 'recruiter_dashboard'
-        st.rerun()
-
-def show_create_candidate_profile_page():
-    st.markdown("<h2 style='text-align: center; color: #FF8C00;'>Create Candidate Profile</h2>", unsafe_allow_html=True)
-    user_id = supabase.auth.get_user().user.id # Get current Supabase user ID
-
-    with st.form("create_candidate_profile_form"):
-        name = st.text_input("Full Name", placeholder="e.g., Jane Doe")
-        email = st.text_input("Email (auto-filled)", value=st.session_state['user_email'], disabled=True)
-        skills = st.text_area("Skills (comma-separated)", placeholder="e.g., Python, SQL, Machine Learning, AWS")
-        experience = st.text_area("Experience Summary", height=150, placeholder="Briefly describe your professional experience.")
-        resume_file = st.file_uploader("Upload Resume (PDF or DOCX)", type=["pdf", "docx"])
-
-        submit_button = st.form_submit_button("Create Profile")
-
-        if submit_button:
-            if name and skills and experience and resume_file:
-                resume_url = None
-                if resume_file:
-                    file_bytes = resume_file.read()
-                    file_extension = os.path.splitext(resume_file.name)[1]
-                    # Use user_id as part of the file path to ensure uniqueness and user-specificity
-                    file_path_in_storage = f"resumes/{user_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}{file_extension}"
-                    resume_url = upload_file_to_supabase("app_files", file_path_in_storage, file_bytes) # Use a dedicated bucket
-
-                if resume_url:
-                    candidate_data = {
-                        "id": user_id, # Link candidate profile to Supabase Auth user ID
-                        "name": name,
-                        "email": email,
-                        "skills": skills,
-                        "experience": experience,
-                        "resume_url": resume_url,
-                        "created_at": datetime.now().isoformat()
-                    }
-                    if add_candidate_profile(candidate_data):
-                        st.success("Candidate profile created successfully!")
-                        st.session_state['current_page'] = 'candidate_dashboard'
-                        st.rerun()
                     else:
-                        st.error("Failed to create candidate profile in database.")
-                else:
-                    st.error("Failed to upload resume. Please try again.")
-            else:
-                st.warning("Please fill in all required fields and upload your resume.")
-    if st.button("Back to Dashboard", key="back_to_candidate_dashboard_from_create_profile"):
-        st.session_state['current_page'] = 'candidate_dashboard'
-        st.rerun()
+                        status_message_placeholder.error(f"Error creating user in Supabase Auth: {response.json()}")
+                        print(f"ERROR (admin_invite_member_page): Supabase Auth user creation failed: {response.json()}")
 
-def show_edit_candidate_profile_page():
-    st.markdown("<h2 style='text-align: center; color: #FF8C00;'>Edit Candidate Profile</h2>", unsafe_allow_html=True)
-    candidate_profile = st.session_state.get('candidate_to_edit')
-    if not candidate_profile:
-        st.error("No candidate profile selected for editing.")
-        if st.button("Back to Dashboard", key="back_to_candidate_dashboard_from_edit_profile_no_profile"):
-            st.session_state['current_page'] = 'candidate_dashboard'
+            except Exception as e: # Catching general Exception
+                error_message = str(e)
+                print(f"ERROR (admin_invite_member_page): Error: {error_message}")
+                if "duplicate key value violates unique constraint" in error_message or "email already registered" in error_message:
+                    status_message_placeholder.error("This email is already registered. Please use a different email.")
+                elif "Password should be at least 6 characters" in error_message:
+                    status_message_placeholder.error("The temporary password is too weak. It must be at least 6 characters long.")
+                else:
+                    status_message_placeholder.error(f"Error inviting new member: {error_message}")
+
+def update_password_page():
+    """Page for new users to update their temporary password."""
+    st.markdown("<h1 style='color: #0D47A1 !important;'>🔑 Update Your Password</h1>", unsafe_allow_html=True)
+    st.write("As a new member, please set your personal password to continue.")
+    print("DEBUG (update_password_page): Displaying update password page.")
+
+    if supabase is None:
+        print("ERROR: update_password_page called but 'supabase' is None.")
+        st.error("Application error: Database connection not established. Please refresh or contact support.")
+        return
+
+    if not st.session_state['new_user_uid_for_pw_reset']:
+        st.warning("You must be logged in with a temporary account to access this page. Please log in.")
+        print("DEBUG (update_password_page): No user UID found for password reset. Redirecting.")
+        if st.button("Go to Login"):
+            st.session_state['current_page'] = 'Login'
             st.rerun()
         return
 
-    user_id = supabase.auth.get_user().user.id # Get current Supabase user ID
+    st.info(f"Updating password for: **{st.session_state['new_user_email_for_pw_reset']}**")
 
-    with st.form("edit_candidate_profile_form"):
-        name = st.text_input("Full Name", value=candidate_profile.get('name', ''))
-        email = st.text_input("Email (auto-filled)", value=candidate_profile.get('email', ''), disabled=True)
-        skills = st.text_area("Skills (comma-separated)", value=candidate_profile.get('skills', ''))
-        experience = st.text_area("Experience Summary", value=candidate_profile.get('experience', ''), height=150)
-        current_resume_url = candidate_profile.get('resume_url')
-        if current_resume_url:
-            st.markdown(f"**Current Resume:** [View]({current_resume_url})", unsafe_allow_html=True)
-        resume_file = st.file_uploader("Upload New Resume (PDF or DOCX) (Optional)", type=["pdf", "docx"])
+    update_status_placeholder = st.empty()
 
-        submit_button = st.form_submit_button("Update Profile")
+    with st.form("update_password_form"):
+        current_temp_password = st.text_input("Current Temporary Password", type="password", help="The password you just used to log in.", key="current_temp_password")
+        new_password = st.text_input("New Password", type="password", help="Your new permanent password.", key="new_password_input")
+        confirm_new_password = st.text_input("Confirm New Password", type="password", help="Re-enter your new password to confirm.", key="confirm_new_password_input")
 
-        if submit_button:
-            if name and skills and experience:
-                updated_resume_url = current_resume_url
-                if resume_file:
-                    file_bytes = resume_file.read()
-                    file_extension = os.path.splitext(resume_file.name)[1]
-                    file_path_in_storage = f"resumes/{user_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}{file_extension}"
-                    new_url = upload_file_to_supabase("app_files", file_path_in_storage, file_bytes)
-                    if new_url:
-                        updated_resume_url = new_url
-                        # Optional: Delete old resume if a new one is uploaded
-                        # if current_resume_url:
-                        #     old_file_path = current_resume_url.split("app_files/")[1] # Extract path from URL
-                        #     delete_file_from_supabase("app_files", old_file_path)
+        submit_update_button = st.form_submit_button("Update Password")
+
+        if submit_update_button:
+            print("DEBUG (update_password_page): 'Update Password' button clicked.")
+            if not (current_temp_password and new_password and confirm_new_password):
+                update_status_placeholder.warning("Please fill in all password fields.")
+                print("DEBUG (update_password_page): Missing password fields.")
+                return
+
+            if new_password != confirm_new_password:
+                update_status_placeholder.error("New passwords do not match.")
+                print("DEBUG (update_password_page): New passwords mismatch.")
+                return
+
+            if len(new_password) < 6:
+                update_status_placeholder.warning("New password must be at least 6 characters long.")
+                print("DEBUG (update_password_page): New password too short.")
+                return
+
+            try:
+                with st.spinner("Updating password..."):
+                    print(f"DEBUG (update_password_page): Attempting to update password for UID: {st.session_state['new_user_uid_for_pw_reset']}")
+                    # Update password in Supabase Auth
+                    # Note: Supabase's update_user_by_id requires service_role key, which we don't use in client.
+                    # A user can update their own password via sign_in_with_password then update_user,
+                    # or by using reset_password_for_email flow.
+                    # For a "first login required" scenario, the most robust way is to use the reset_password_for_email flow
+                    # or have the user log in with temp password and then use update_user.
+                    # Given the current flow, we'll simulate an update via admin call (which needs service_role)
+                    # OR, more practically, guide the user to use the "Forgot Password" flow if they need to change.
+                    # For now, let's assume `admin.update_user_by_id` is available (which it is via admin client).
+
+                    # Re-authenticate with the temporary password to get a valid session for the user
+                    # This is crucial for the user to be able to update their own password securely.
+                    auth_response = supabase.auth.sign_in_with_password({
+                        "email": st.session_state['new_user_email_for_pw_reset'],
+                        "password": current_temp_password
+                    })
+
+                    if auth_response.user:
+                        # Now that the user is authenticated with the temp password, update their password
+                        update_response = supabase.auth.update_user({"password": new_password})
+                        if update_response.user:
+                            # Update firstLoginRequired status in 'users' table
+                            supabase.table('users').update({'firstLoginRequired': False}).eq('id', st.session_state['new_user_uid_for_pw_reset']).execute()
+
+                            update_status_placeholder.success("Password updated successfully! Please log in with your new password.")
+                            print("DEBUG (update_password_page): Password updated and firstLoginRequired set to False.")
+                            time.sleep(2)
+                            logout_user() # Log out to force re-login with new password
+                        else:
+                            update_status_placeholder.error(f"Failed to update password: {update_response.json()}")
+                            print(f"ERROR (update_password_page): Supabase update_user failed: {update_response.json()}")
                     else:
-                        st.error("Failed to upload new resume. Profile not updated.")
-                        return
+                        update_status_placeholder.error("Current temporary password is incorrect.")
+                        print(f"ERROR (update_password_page): Invalid temporary password provided for update.")
 
-                updated_data = {
-                    "name": name,
-                    "skills": skills,
-                    "experience": experience,
-                    "resume_url": updated_resume_url
-                }
-                if update_candidate_profile(user_id, updated_data):
-                    st.success("Candidate profile updated successfully!")
-                    del st.session_state['candidate_to_edit']
-                    st.session_state['current_page'] = 'candidate_dashboard'
-                    st.rerun()
+            except Exception as e: # Catching general Exception
+                error_message = str(e)
+                print(f"ERROR (update_password_page): Error during password update: {error_message}")
+                if "Password should be at least 6 characters" in error_message:
+                    update_status_placeholder.error("The new password is too weak. Please choose a stronger one.")
                 else:
-                    st.error("Failed to update candidate profile.")
-            else:
-                st.warning("Please fill in all required fields.")
-    if st.button("Back to Dashboard", key="back_to_candidate_dashboard_from_edit_profile"):
-        del st.session_state['candidate_to_edit']
-        st.session_state['current_page'] = 'candidate_dashboard'
-        st.rerun()
+                    update_status_placeholder.error(f"Error updating password: {error_message}")
 
-def show_apply_for_job_page():
-    st.markdown("<h2 style='text-align: center; color: #FF8C00;'>Apply for Job</h2>", unsafe_allow_html=True)
-    job = st.session_state.get('job_to_apply')
-    if not job:
-        st.error("No job selected to apply for.")
-        if st.button("Back to Browse Jobs", key="back_to_browse_jobs_no_job"):
-            st.session_state['current_page'] = 'candidate_dashboard'
-            st.rerun()
-        return
 
-    st.write(f"Applying for: **{job['title']}** at **{job['company']}**")
-    st.markdown(f"**Job Description:** {job['description']}")
+# --- Main Streamlit Application Logic ---
 
-    user_id = supabase.auth.get_user().user.id
-    candidate_profile = get_candidate_by_id(user_id)
-
-    if not candidate_profile or not candidate_profile.get('resume_url'):
-        st.warning("You need a complete profile with a resume to apply. Please create/edit your profile first.")
-        if st.button("Go to My Profile", key="go_to_profile_from_apply"):
-            st.session_state['current_page'] = 'candidate_dashboard'
-            st.rerun()
-        return
-
-    st.write(f"Your current resume: [View]({candidate_profile['resume_url']})")
-
-    # AI Matching Section
-    st.subheader("AI Resume Match")
-    if st.button("Analyze Resume vs. Job Description", key="analyze_match_btn"):
-        with st.spinner("Analyzing..."):
-            # Download resume to extract text
-            resume_bytes = download_file_from_supabase("app_files", candidate_profile['resume_url'].split("app_files/")[1])
-            if resume_bytes:
-                # Determine file type and extract text
-                file_extension = os.path.splitext(candidate_profile['resume_url'])[1].lower()
-                resume_text = ""
-                if file_extension == '.pdf':
-                    resume_text = extract_text_from_pdf(io.BytesIO(resume_bytes))
-                elif file_extension == '.docx':
-                    resume_text = extract_text_from_docx(io.BytesIO(resume_bytes))
-                else:
-                    st.error("Unsupported resume file type for AI analysis.")
-
-                if resume_text:
-                    match_result = match_resume_to_job(resume_text, job['description'])
-                    st.markdown(f"<div class='ai-response-box'>{match_result}</div>", unsafe_allow_html=True)
-                else:
-                    st.error("Could not extract text from your resume for AI analysis.")
-            else:
-                st.error("Could not download your resume for AI analysis.")
-
-    if st.button("Confirm Application", key="confirm_application_btn"):
-        application_data = {
-            "job_id": job['id'],
-            "candidate_id": user_id,
-            "applied_date": datetime.now().isoformat(),
-            "status": "Pending",
-            "resume_url": candidate_profile['resume_url'] # Use the URL from candidate's profile
-        }
-        if add_application(application_data):
-            st.success(f"Successfully applied for {job['title']}!")
-            del st.session_state['job_to_apply']
-            st.session_state['current_page'] = 'candidate_dashboard'
-            st.rerun()
-        else:
-            st.error("Failed to submit application.")
-
-    if st.button("Back to Browse Jobs", key="back_to_browse_jobs_from_apply"):
-        del st.session_state['job_to_apply']
-        st.session_state['current_page'] = 'candidate_dashboard'
-        st.rerun()
-
-def show_view_candidate_profile_page():
-    st.markdown("<h2 style='text-align: center; color: #FF8C00;'>Candidate Profile</h2>", unsafe_allow_html=True)
-    candidate_profile = st.session_state.get('candidate_to_view')
-    if not candidate_profile:
-        st.error("No candidate selected to view.")
-        if st.button("Back to All Candidates", key="back_to_all_candidates_no_profile"):
-            st.session_state['current_page'] = 'recruiter_dashboard'
-            st.rerun()
-        return
-
-    st.write(f"**Name:** {candidate_profile.get('name', 'N/A')}")
-    st.write(f"**Email:** {candidate_profile.get('email', 'N/A')}")
-    st.write(f"**Skills:** {candidate_profile.get('skills', 'N/A')}")
-    st.write(f"**Experience:** {candidate_profile.get('experience', 'N/A')}")
-    if candidate_profile.get('resume_url'):
-        st.markdown(f"**Resume:** [View Resume]({candidate_profile['resume_url']})", unsafe_allow_html=True)
-
-    st.subheader("AI Resume Summary")
-    if st.button("Generate Resume Summary", key="generate_resume_summary_btn"):
-        with st.spinner("Generating summary..."):
-            resume_url = candidate_profile.get('resume_url')
-            if resume_url:
-                # Download resume to extract text
-                resume_bytes = download_file_from_supabase("app_files", resume_url.split("app_files/")[1])
-                if resume_bytes:
-                    file_extension = os.path.splitext(resume_url)[1].lower()
-                    resume_text = ""
-                    if file_extension == '.pdf':
-                        resume_text = extract_text_from_pdf(io.BytesIO(resume_bytes))
-                    elif file_extension == '.docx':
-                        resume_text = extract_text_from_docx(io.BytesIO(resume_bytes))
-                    else:
-                        st.error("Unsupported resume file type for AI analysis.")
-
-                    if resume_text:
-                        summary = generate_resume_summary(resume_text)
-                        st.markdown(f"<div class='ai-response-box'>{summary}</div>", unsafe_allow_html=True)
-                    else:
-                        st.error("Could not extract text from resume for summary generation.")
-                else:
-                    st.error("Could not download resume for summary generation.")
-            else:
-                st.info("No resume available for this candidate to summarize.")
-
-    if st.button("Back to All Candidates", key="back_to_all_candidates_from_view_profile"):
-        del st.session_state['candidate_to_view']
-        st.session_state['current_page'] = 'recruiter_dashboard'
-        st.rerun()
-
-# --- Main Application Logic ---
 def main():
-    # Sidebar for navigation and authentication
-    with st.sidebar:
-        st.image("https://placehold.co/150x50/FF8C00/FFFFFF?text=SSO+Logo", use_column_width=True)
-        st.markdown("---")
+    """Main function to set up Streamlit page and handle navigation/authentication."""
+    # Robustly manage current_page state after login/logout
+    if st.session_state['logged_in'] and st.session_state['current_page'] in ['Login', 'Signup']:
+        st.session_state['current_page'] = 'Dashboard'
+    elif not st.session_state['logged_in'] and st.session_state['current_page'] not in ['Login', 'Signup', 'Update Password']:
+        st.session_state['current_page'] = 'Login'
+        st.session_state['login_mode'] = None
 
-        if st.session_state['logged_in']:
-            st.write(f"Logged in as: **{st.session_state['user_email']}**")
-            st.write(f"Role: **{st.session_state['user_role'].capitalize()}**")
+    # Conditional rendering for sidebar (only if logged in)
+    if st.session_state['logged_in']:
+        with st.sidebar:
+            # Sidebar branding
+            st.markdown("<h1 style='color: #000000 !important;'>SSO Consultants</h1>", unsafe_allow_html=True) # Forced black
+            st.markdown("<h2 style='color: #000000 !important;'>AI Recruitment Dashboard</h2>", unsafe_allow_html=True) # Forced black
             st.markdown("---")
 
-            if st.session_state['user_role'] == 'admin' or st.session_state['user_role'] == 'recruiter':
-                if st.button("Recruiter Dashboard", key="sidebar_recruiter_dashboard"):
-                    st.session_state['current_page'] = 'recruiter_dashboard'
-                    st.rerun()
-            if st.session_state['user_role'] == 'admin' or st.session_state['user_role'] == 'candidate':
-                if st.button("Candidate Dashboard", key="sidebar_candidate_dashboard"):
-                    st.session_state['current_page'] = 'candidate_dashboard'
-                    st.rerun()
+            st.write(f"Welcome, **{st.session_state['user_name']}**!")
+            if st.session_state['is_admin']:
+                st.markdown("<h3 style='color: #000000 !important;'>Admin Privileges Active</h3>", unsafe_allow_html=True)
+
+            # Navigation for logged-in users (User & Admin)
+            user_pages = ['Dashboard', 'Upload JD & CV']
+            admin_pages = ['Admin Dashboard', 'Admin: User Management', 'Admin: Report Management', 'Admin: Invite New Member']
+
+            all_pages = user_pages
+            if st.session_state['is_admin']:
+                all_pages.extend(['Review Reports']) # Add back for admins only
+                all_pages.extend(admin_pages)
+
+            try:
+                if st.session_state['current_page'] not in all_pages:
+                    st.session_state['current_page'] = 'Dashboard'
+                default_index = all_pages.index(st.session_state['current_page'])
+            except ValueError:
+                default_index = 0
+
+            def update_page_selection():
+                st.session_state['current_page'] = st.session_state['sidebar_radio_selection']
+                print(f"DEBUG (sidebar_radio): Page selected: {st.session_state['current_page']}")
+
+            page_selection = st.radio(
+                "Navigation",
+                all_pages,
+                key="sidebar_radio_selection",
+                index=default_index,
+                on_change=update_page_selection
+            )
 
             st.markdown("---")
-            if st.button("Logout", key="sidebar_logout"):
+            if st.button("Logout", key="logout_button_sidebar"): # Unique key for sidebar logout
                 logout_user()
-        else:
-            st.subheader("Login / Register")
-            login_tab, register_tab = st.tabs(["Login", "Register"])
 
-            with login_tab:
-                st.markdown(f"<h3>Login as { 'Admin' if st.session_state['login_mode'] == 'admin' else 'User'}</h3>", unsafe_allow_html=True)
+        # Add a div to the main content area for logged-in users to override centering if needed
+        st.markdown('<div class="logged-in-main-content">', unsafe_allow_html=True)
+
+        # --- Render Logged-in Pages ---
+        if st.session_state['current_page'] == 'Dashboard':
+            dashboard_page()
+        elif st.session_state['current_page'] == 'Upload JD & CV':
+            upload_jd_cv_page()
+        elif st.session_state['is_admin'] and st.session_state['current_page'] == 'Review Reports':
+            review_reports_page()
+        elif st.session_state['is_admin'] and st.session_state['current_page'] == 'Admin Dashboard':
+            admin_dashboard_page()
+        elif st.session_state['is_admin'] and st.session_state['current_page'] == 'Admin: User Management':
+            admin_user_management_page()
+        elif st.session_state['is_admin'] and st.session_state['current_page'] == 'Admin: Report Management':
+            admin_report_management_page()
+        elif st.session_state['is_admin'] and st.session_state['current_page'] == 'Admin: Invite New Member':
+            admin_invite_member_page()
+        elif st.session_state['current_page'] == 'Update Password':
+             update_password_page()
+        else:
+            st.error("Access Denied or Page Not Found. Please navigate using the sidebar.")
+            print(f"ERROR (main rendering): Invalid page state for logged-in user: {st.session_state['current_page']}")
+
+        st.markdown('</div>', unsafe_allow_html=True) # Close the logged-in-main-content div
+
+    # --- Main Content Area when NOT logged in (Login/Landing Page) ---
+    else:
+        st.markdown("<h1 class='main-app-title'>SSO Consultants AI Recruitment System</h1>", unsafe_allow_html=True)
+        st.markdown("<p class='sub-app-title'>Streamlined Talent Acquisition with AI-Powered Insights</p>", unsafe_allow_html=True)
+
+        # Use columns to center the buttons and potentially the login form
+        col_left_spacer_buttons, col_buttons, col_right_spacer_buttons = st.columns([1, 2, 1])
+        with col_buttons: # Buttons in the middle column
+            admin_col, user_col = st.columns(2)
+            with admin_col:
+                if st.button("Login as Admin", key="button_login_admin_main_page"):
+                    st.session_state['login_mode'] = 'admin'
+                    st.session_state['current_page'] = 'Login'
+                    print("DEBUG (main): Admin login mode selected from main page.")
+                    st.rerun()
+            with user_col:
+                if st.button("Login as User", key="button_login_user_main_page"):
+                    st.session_state['login_mode'] = 'user'
+                    st.session_state['current_page'] = 'Login'
+                    print("DEBUG (main): User login mode selected from main page.")
+                    st.rerun()
+
+        # Display the 'Please select' message
+        col_left_spacer_info, col_info_center, col_right_spacer_info = st.columns([1, 2, 1])
+        with col_info_center:
+            if st.session_state['login_mode'] is None:
+                st.markdown("<p class='initial-info-message'>Please select 'Login as Admin' or 'Login as User' to proceed.</p>", unsafe_allow_html=True)
+
+        # Only show login form if a mode has been selected
+        if st.session_state['login_mode']:
+            col_form_left, col_form_center, col_form_right = st.columns([1, 2, 1])
+            with col_form_center: # Form in the middle column
+                # The h3 for login form title is explicitly targeted here
+                st.markdown(f"<h3 style='text-align: center; color: #000000 !important;'>🔑 Login as {'Administrator' if st.session_state['login_mode'] == 'admin' else 'User'}</h3>", unsafe_allow_html=True)
                 with st.form("login_form"):
                     email = st.text_input("Email")
                     password = st.text_input("Password", type="password")
@@ -1208,75 +1539,6 @@ def main():
                             login_user(email, password, login_as_admin_attempt=(st.session_state['login_mode'] == 'admin'))
                         else:
                             st.warning("Please enter both email and password.")
-                # Toggle between user/admin login mode
-                if st.session_state['login_mode'] == 'user':
-                    if st.button("Login as Admin"):
-                        st.session_state['login_mode'] = 'admin'
-                        st.rerun()
-                else:
-                    if st.button("Login as User"):
-                        st.session_state['login_mode'] = 'user'
-                        st.rerun()
-
-                st.markdown("---")
-                if st.button("Forgot Password?", key="forgot_password_btn"):
-                    st.session_state['current_page'] = 'forgot_password'
-                    st.rerun()
-
-            with register_tab:
-                with st.form("register_form"):
-                    reg_email = st.text_input("Email", key="reg_email")
-                    reg_password = st.text_input("Password", type="password", key="reg_password")
-                    reg_role = st.selectbox("Register as:", ["candidate", "recruiter"], key="reg_role")
-                    reg_submit_button = st.form_submit_button("Register")
-                    if reg_submit_button:
-                        if reg_email and reg_password:
-                            register_user(reg_email, reg_password, reg_role)
-                        else:
-                            st.warning("Please enter both email and password.")
-
-    # Main content area based on session state
-    if st.session_state['logged_in']:
-        if st.session_state.get('current_page') == 'recruiter_dashboard' and (st.session_state['user_role'] == 'recruiter' or st.session_state['user_role'] == 'admin'):
-            show_recruiter_dashboard()
-        elif st.session_state.get('current_page') == 'add_job' and (st.session_state['user_role'] == 'recruiter' or st.session_state['user_role'] == 'admin'):
-            show_add_job_page()
-        elif st.session_state.get('current_page') == 'edit_job' and (st.session_state['user_role'] == 'recruiter' or st.session_state['user_role'] == 'admin'):
-            show_edit_job_page()
-        elif st.session_state.get('current_page') == 'view_candidate_profile' and (st.session_state['user_role'] == 'recruiter' or st.session_state['user_role'] == 'admin'):
-            show_view_candidate_profile_page()
-        elif st.session_state.get('current_page') == 'candidate_dashboard' and (st.session_state['user_role'] == 'candidate' or st.session_state['user_role'] == 'admin'):
-            show_candidate_dashboard()
-        elif st.session_state.get('current_page') == 'create_candidate_profile' and (st.session_state['user_role'] == 'candidate' or st.session_state['user_role'] == 'admin'):
-            show_create_candidate_profile_page()
-        elif st.session_state.get('current_page') == 'edit_candidate_profile' and (st.session_state['user_role'] == 'candidate' or st.session_state['user_role'] == 'admin'):
-            show_edit_candidate_profile_page()
-        elif st.session_state.get('current_page') == 'apply_for_job' and (st.session_state['user_role'] == 'candidate' or st.session_state['user_role'] == 'admin'):
-            show_apply_for_job_page()
-        else:
-            # Default logged-in view based on role
-            if st.session_state['user_role'] == 'recruiter' or st.session_state['user_role'] == 'admin':
-                show_recruiter_dashboard()
-            elif st.session_state['user_role'] == 'candidate':
-                show_candidate_dashboard()
-            else:
-                show_home_page() # Fallback
-    else:
-        if st.session_state.get('current_page') == 'forgot_password':
-            st.markdown("<h2 style='text-align: center; color: #FF8C00;'>Forgot Password</h2>", unsafe_allow_html=True)
-            with st.form("forgot_password_form"):
-                email = st.text_input("Enter your email address to reset password:")
-                submit_button = st.form_submit_button("Send Reset Link")
-                if submit_button:
-                    if email:
-                        reset_password(email)
-                    else:
-                        st.warning("Please enter your email.")
-            if st.button("Back to Login", key="back_to_login_from_forgot_password"):
-                st.session_state['current_page'] = None # Go back to default login view
-                st.rerun()
-        else:
-            show_home_page()
 
     # --- Custom FOOTER (Always visible at the bottom of the page) ---
     st.markdown(
@@ -1303,4 +1565,3 @@ def main():
 # Entry point for the Streamlit application
 if __name__ == "__main__":
     main()
-    
