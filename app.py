@@ -914,7 +914,7 @@ def upload_jd_cv_page():
             
             # --- START OF CHATGPT SUGGESTED CHANGE: SAVE TO CLOUD BEFORE DISPLAYING DOWNLOAD BUTTON ---
             # Generate filename for saving
-            timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+            timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
             download_filename = f"{st.session_state['user_name'].replace(' ', '')}_JD-CV_Comparison_Analysis_{timestamp_str}.docx"
 
             # Adding extra debug prints
