@@ -1038,11 +1038,12 @@ def delete_file_from_supabase_storage(file_path_in_storage, user_uid_for_deletio
             print("DEBUG (delete_file_from_supabase_storage): Using regular client for user deletion.")
 
         # MODIFIED: Use the determined client for removal
-        response = supabase_target_client.storage.from_(bucket_name).remove([file_path_in_storage])
-        if response.status_code == 200:
-            return True
-        else:
-            print(f"ERROR (delete_file_from_supabase_storage): Delete failed: {response.status_code} - {response.json()}")
+        # Attempt to remove the file. If successful, it returns a dict. If not, it raises an exception.
+        response_data = supabase_target_client.storage.from_(bucket_name).remove([file_path_in_storage])
+        
+        # If we reach here, the removal was successful (no exception was raised)
+        print(f"DEBUG (delete_file_from_supabase_storage): Delete successful. Response data: {response_data}")
+        return True
             return False
     except Exception as e:
         print(f"ERROR (delete_file_from_supabase_storage): {e}")
