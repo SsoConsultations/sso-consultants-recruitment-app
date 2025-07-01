@@ -381,7 +381,10 @@ except Exception as e:
 
 # Admin Credentials (for a hardcoded admin user, outside Supabase Auth)
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@sso.com")
-ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH", bcrypt.gensalt().decode('utf-8')) # Default hash for "adminpass" if not set
+# Default hash for "adminpass" if not set, for initial setup convenience.
+# In production, this should always be set via environment variable with a strong, generated hash.
+ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH", bcrypt.hashpw("adminpass".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'))
+
 
 # --- Streamlit Session State Initialization ---
 if 'logged_in' not in st.session_state:
