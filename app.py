@@ -6,6 +6,7 @@ import re
 import bcrypt
 from datetime import datetime
 import time
+import uuid
 
 # --- Supabase Imports ---
 from supabase import create_client, Client
