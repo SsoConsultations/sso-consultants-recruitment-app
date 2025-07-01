@@ -1008,7 +1008,13 @@ def upload_file_to_supabase(file_bytes, file_name, user_uid): # MODIFIED: Added 
         # Upload the file. If successful, it returns a dict. If not, it raises an exception.
         # Adding 'upsert=True' here as a fallback to prevent 409 errors if uniqueness fails for some reason
         # and to explicitly allow overwrites if the same file is uploaded again.
-        response_data = supabase_target_client.storage.from_(bucket_name).upload(file_path_in_storage, file_bytes, {"upsert": True}) # ADDED upsert=True
+        # Upload the file. If successful, it returns a dict. If not, it raises an exception.
+        # The 'upsert' option needs to be passed within a 'file_options' dictionary.
+        response_data = supabase_target_client.storage.from_(bucket_name).upload(
+            file_path_in_storage, 
+            file_bytes, 
+            file_options={"upsert": True} # MODIFIED: upsert needs to be inside file_options
+        )
 
         # Check if response_data is valid (e.g., not None or empty)
         if response_data:
