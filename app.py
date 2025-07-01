@@ -842,6 +842,149 @@ def logout_user():
         st.error(f"Error during logout: {e}")
         print(f"ERROR (logout_user): Error during logout: {e}")
 
+# --- Streamlit Page Functions ---
+def dashboard_page():
+    """Displays the user dashboard."""
+    # Applying color directly with markdown for st.title, as it's not a generic h1 but specific
+    st.markdown(f"<h1 style='color: #0D47A1 !important;'>Welcome, {st.session_state['user_name']}!</h1>", unsafe_allow_html=True)
+    st.write("This is your dashboard. Use the sidebar to navigate.")
+    st.info("To get started, navigate to 'Upload JD & CV' to perform a new AI-powered comparative analysis.")
+    if st.session_state['is_admin']: # Only show for admin
+        st.write("As an admin, you can also check 'Review Reports' to see all past analyses.")
+    print(f"DEBUG (dashboard_page): Displaying dashboard for {st.session_state['user_name']}.") 
+
+def upload_jd_cv_page():
+    """Handles JD and CV uploads, triggers AI review, and displays/downloads results."""
+    st.markdown("<h1 style='color: #0D47A1 !important;'>⬆️ Upload JD & CV for AI Review</h1>", unsafe_allow_html=True)
+    st.write("Upload your Job Description and multiple Candidate CVs to start the comparative analysis.")
+    print("DEBUG (upload_jd_cv_page): Displaying upload page.") 
+
+    uploaded_jd = st.file_uploader("Upload Job Description (PDF, DOCX, TXT)", type=["pdf", "docx", "txt"], key="jd_uploader")
+    uploaded_cvs = st.file_uploader("Upload Candidate's CVs (Multiple - PDF, DOCX, TXT)", type=["pdf", "docx", "txt"], accept_multiple_files=True, key="cv_uploader")
+
+    if st.button("Start AI Review", key="start_review_button"):
+        print("DEBUG (upload_jd_cv_page): 'Start AI Review' button clicked.") 
+        if not uploaded_jd:
+            st.warning("Please upload a Job Description.")
+            return
+        if not uploaded_cvs:
+            st.warning("Please upload at least one Candidate CV.")
+            return
+
+        jd_text = get_file_content(uploaded_jd, uploaded_jd.name)
+        
+        all_candidates_data = []
+        cv_filenames_list = [] 
+        for cv_file in uploaded_cvs:
+            cv_text = get_file_content(cv_file, cv_file.name)
+            if cv_text:
+                all_candidates_data.append({'filename': cv_file.name, 'text': cv_text})
+                cv_filenames_list.append(cv_file.name) 
+            else:
+                st.warning(f"Could not process CV: {cv_file.name}. Skipping it.")
+        
+        if not jd_text:
+            st.error("Failed to extract text from the Job Description.")
+            return
+        if not all_candidates_data:
+            st.error("No valid CVs could be processed for analysis.")
+            return
+
+        st.session_state['review_triggered'] = False 
+        st.session_state['ai_review_result'] = None
+        st.session_state['generated_docx_buffer'] = None
+
+        comparative_results = get_comparative_ai_analysis(jd_text, all_candidates_data)
+
+        if "error" in comparative_results:
+            st.error(f"AI analysis failed: {comparative_results['error']}")
+        else:
+            st.session_state['ai_review_result'] = comparative_results
+            st.success("AI review completed successfully!")
+            print("DEBUG (upload_jd_cv_page): AI review successful. Preparing DOCX.") 
+            
+            st.session_state['jd_filename_for_save'] = uploaded_jd.name
+            st.session_state['cv_filenames_for_save'] = cv_filenames_list 
+
+            st.session_state['generated_docx_buffer'] = generate_docx_report(
+                comparative_results, 
+                st.session_state['jd_filename_for_save'], 
+                ", ".join(st.session_state['cv_filenames_for_save'])
+            )
+            
+            # --- START OF CHATGPT SUGGESTED CHANGE: SAVE TO CLOUD BEFORE DISPLAYING DOWNLOAD BUTTON ---
+            # Generate filename for saving
+            timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+            download_filename = f"{st.session_state['user_name'].replace(' ', '')}_JD-CV_Comparison_Analysis_{timestamp_str}.docx"
+
+            # Adding extra debug prints
+            print("DEBUG (upload_jd_cv_page): Calling save_report_on_download now...")
+            
+            # ✅ CALL save_report_on_download DIRECTLY here
+            save_report_on_download(
+                download_filename,
+                st.session_state['generated_docx_buffer'],
+                st.session_state['ai_review_result'],
+                st.session_state['jd_filename_for_save'],
+                st.session_state['cv_filenames_for_save']
+            )
+            print("DEBUG (upload_jd_cv_page): save_report_on_download call completed.")
+            # --- END OF CHATGPT SUGGESTED CHANGE ---
+
+            st.session_state['review_triggered'] = True 
+
+    if st.session_state['review_triggered'] and st.session_state['ai_review_result']:
+        print("DEBUG (upload_jd_cv_page): Displaying AI review results section.") 
+        comparative_results = st.session_state['ai_review_result']
+
+        st.subheader("AI Review Results:")
+
+        candidate_evaluations_data = comparative_results.get("candidate_evaluations", [])
+        if candidate_evaluations_data:
+            st.markdown("### 🧾 Candidate Evaluation Table")
+            df_evaluations = pd.DataFrame(candidate_evaluations_data)
+            expected_cols_eval = ["Candidate Name", "Match %", "Ranking", "Shortlist Probability", "Key Strengths", "Key Gaps", "Location Suitability", "Comments"]
+            for col in expected_cols_eval:
+                if col not in df_evaluations.columns:
+                    df_evaluations[col] = "N/A"
+            df_evaluations = df_evaluations[expected_cols_eval]
+
+            st.dataframe(df_evaluations, use_container_width=True, hide_index=True)
+        
+        criteria_observations_data = comparative_results.get("criteria_observations", [])
+        if criteria_observations_data:
+            st.markdown("### ✅ Additional Observations (Criteria Comparison)")
+            df_criteria = pd.DataFrame(criteria_observations_data)
+            st.dataframe(df_criteria, use_container_width=True, hide_index=True)
+
+        additional_observations_text = comparative_results.get("additional_observations_text", "No general observations provided.")
+        if additional_observations_text and additional_observations_text.strip() not in ["No general observations provided.", ""]:
+            st.markdown("### General Observations")
+            st.write(additional_observations_text)
+
+        final_shortlist_recommendation = comparative_results.get("final_shortlist_recommendation", "No final recommendation provided.")
+        if final_shortlist_recommendation and final_shortlist_recommendation.strip() not in ["No final recommendation provided.", ""]:
+            st.markdown("### 📌 Final Shortlist Recommendation")
+            st.write(final_shortlist_recommendation)
+
+        st.markdown("---") 
+
+        st.subheader("Download & Save Report")
+        
+        # --- START OF CHATGPT SUGGESTED CHANGE (Modified download button structure) ---
+        # No more on_click for save_report_on_download here as it's called earlier
+        if st.session_state['generated_docx_buffer']:
+            st.download_button(
+                label="Download DOCX Report ⬇️", # Label changed for clarity
+                data=st.session_state['generated_docx_buffer'],
+                file_name=download_filename, # Use the same filename generated for saving
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
+                key="download_docx_only" # New key for this button
+            )
+        else:
+            st.warning("Run an AI review to generate a report for download and save.")
+        # --- END OF CHATGPT SUGGESTED CHANGE ---
+
 # --- Supabase Storage & Database Functions ---
 
 def upload_file_to_supabase(file_bytes, file_name, user_uid): # MODIFIED: Added user_uid parameter
