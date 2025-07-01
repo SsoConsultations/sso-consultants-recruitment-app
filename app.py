@@ -6,7 +6,6 @@ import re
 import bcrypt
 from datetime import datetime
 import time
-import uuid
 
 # --- Supabase Imports ---
 from supabase import create_client, Client
@@ -914,9 +913,9 @@ def upload_jd_cv_page():
             )
             
             # --- START OF CHATGPT SUGGESTED CHANGE: SAVE TO CLOUD BEFORE DISPLAYING DOWNLOAD BUTTON ---
-            # Generate filename for saving with a UUID for absolute uniqueness
-            unique_id = uuid.uuid4().hex # Generate a unique hexadecimal string
-            download_filename = f"{st.session_state['user_name'].replace(' ', '')}_JD-CV_Comparison_Analysis_{datetime.now().strftime('%Y%m%d_%H%M%S_f%')}_{unique_id}.docx"
+            # Generate filename for saving
+            timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+            download_filename = f"{st.session_state['user_name'].replace(' ', '')}_JD-CV_Comparison_Analysis_{timestamp_str}.docx"
 
             # Adding extra debug prints
             print("DEBUG (upload_jd_cv_page): Calling save_report_on_download now...")
@@ -992,7 +991,7 @@ def upload_file_to_supabase(file_bytes, file_name, user_uid): # MODIFIED: Added 
     """Uploads a file to Supabase Storage and returns its public URL.
     Uses service_role client if user_uid is 'admin_special_uid'."""
     try:
-        bucket_name = "app-files" # MODIFIED: Ensure this bucket exists in your Supabase Storage (using underscore)
+        bucket_name = "app_files" # MODIFIED: Ensure this bucket exists in your Supabase Storage (using underscore)
         # Use a unique path for each file, including user_uid for organization
         file_path_in_storage = f"jd_cv_reports/{user_uid}/{file_name}"
 
@@ -1005,53 +1004,15 @@ def upload_file_to_supabase(file_bytes, file_name, user_uid): # MODIFIED: Added 
             print("DEBUG (upload_file_to_supabase): Using regular client for user upload.")
 
         # MODIFIED: Use the determined client for upload
-        # Upload the file. If successful, it returns a dict. If not, it raises an exception.
-        # Adding 'upsert=True' here as a fallback to prevent 409 errors if uniqueness fails for some reason
-        # and to explicitly allow overwrites if the same file is uploaded again.
-        # Upload the file. If successful, it returns a dict. If not, it raises an exception.
-        # The 'upsert' option needs to be passed within a 'file_options' dictionary.
-        # Check if the file already exists before attempting to upload
-        # This will prevent the 409 error and the 'bool' header error if upsert was the issue.
-        try:
-            # Attempt to list files in the directory to see if our specific file exists
-            # Supabase Storage list method returns a list of file metadata if successful
-            list_response = supabase_target_client.storage.from_(bucket_name).list(
-                path=os.path.dirname(file_path_in_storage), # List files in the parent directory
-                options={"search": os.path.basename(file_path_in_storage)} # Search for the specific filename
-            )
-            
-            # If the list_response contains our file, it means it exists
-            file_exists = any(item['name'] == os.path.basename(file_path_in_storage) for item in list_response)
-            
-            if file_exists:
-                print(f"DEBUG (upload_file_to_supabase): File '{file_path_in_storage}' already exists. Attempting to delete before re-upload.")
-                # If it exists, delete it first. Use the same client for consistency.
-                supabase_target_client.storage.from_(bucket_name).remove([file_path_in_storage])
-                print(f"DEBUG (upload_file_to_supabase): Old file '{file_path_in_storage}' deleted.")
-        except Exception as e:
-            # Log any error during the existence check or initial delete, but don't stop the process yet
-            print(f"WARNING (upload_file_to_supabase): Error during pre-upload check/delete for {file_path_in_storage}: {e}")
-            # This might happen if the directory doesn't exist, which is fine.
+        response = supabase_target_client.storage.from_(bucket_name).upload(file_path_in_storage, file_bytes)
 
-        # Now, attempt the upload without the 'upsert' option
-        # This operation will now always be an 'insert new file' after a potential delete.
-        response_data = supabase_target_client.storage.from_(bucket_name).upload(
-            file_path_in_storage,
-            file_bytes
-            # Removed file_options={"upsert": True}
-        )
-
-        # Check if response_data is valid (e.g., not None or empty)
-        if response_data:
-            print(f"DEBUG (upload_file_to_supabase): Upload successful. Response data: {response_data}")
-            # Get public URL. This call itself will raise an error if the file isn't found,
-            # which would be caught by the outer try-except.
+        if response.status_code in [200, 201]: # 200 for existing, 201 for new
+            # Get public URL
             public_url_response = supabase_target_client.storage.from_(bucket_name).get_public_url(file_path_in_storage)
             return public_url_response
         else:
-            # This case might indicate an empty response or unexpected non-exception failure
-            st.error(f"Supabase Storage upload failed: Empty or invalid response from server.")
-            print(f"ERROR (upload_file_to_supabase): Upload failed - empty or invalid response. Response data: {response_data}")
+            st.error(f"Supabase Storage upload failed: {response.status_code} - {response.json()}")
+            print(f"ERROR (upload_file_to_supabase): Upload failed: {response.status_code} - {response.json()}")
             return None
     except Exception as e:
         st.error(f"Error uploading file to Supabase Storage: {e}")
@@ -1062,7 +1023,7 @@ def delete_file_from_supabase_storage(file_path_in_storage, user_uid_for_deletio
     """Deletes a file from Supabase Storage.
     Uses service_role client if user_uid_for_deletion_check is 'admin_special_uid'."""
     try:
-        bucket_name = "app-files" # MODIFIED: Using underscore
+        bucket_name = "app_files" # MODIFIED: Using underscore
 
         # ADDED: Determine which client to use for deletion
         if user_uid_for_deletion_check == "admin_special_uid":
@@ -1073,16 +1034,11 @@ def delete_file_from_supabase_storage(file_path_in_storage, user_uid_for_deletio
             print("DEBUG (delete_file_from_supabase_storage): Using regular client for user deletion.")
 
         # MODIFIED: Use the determined client for removal
-        # Attempt to remove the file. If successful, it returns a dict. If not, it raises an exception.
-        response_data = supabase_target_client.storage.from_(bucket_name).remove([file_path_in_storage])
-        
-        # Check if response_data is valid (e.g., not None or empty)
-        if response_data:
-            print(f"DEBUG (delete_file_from_supabase_storage): Delete successful. Response data: {response_data}")
+        response = supabase_target_client.storage.from_(bucket_name).remove([file_path_in_storage])
+        if response.status_code == 200:
             return True
         else:
-            # This case might indicate an empty response or unexpected non-exception failure
-            print(f"ERROR (delete_file_from_supabase_storage): Delete failed - empty or invalid response. Response data: {response_data}")
+            print(f"ERROR (delete_file_from_supabase_storage): Delete failed: {response.status_code} - {response.json()}")
             return False
     except Exception as e:
         print(f"ERROR (delete_file_from_supabase_storage): {e}")
