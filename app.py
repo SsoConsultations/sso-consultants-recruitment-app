@@ -333,6 +333,7 @@ st.markdown(
 # --- Configuration: NOW READING FROM ENVIRONMENT VARIABLES ---
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") # ADDED FOR ADMIN OPERATIONS
 
 # --- Supabase Initialization Function ---
 def initialize_supabase_app():
@@ -342,15 +343,21 @@ def initialize_supabase_app():
     """
     print("DEBUG: Attempting to initialize Supabase client...")
     try:
-        if not SUPABASE_URL or not SUPABASE_KEY:
-            print("ERROR: Supabase URL or Key not found in environment variables.")
-            st.error("Supabase URL or Key not found in environment variables. Please configure them.")
+        if not SUPABASE_URL or not SUPABASE_KEY or not SUPABASE_SERVICE_ROLE_KEY: # MODIFIED: Check for service key too
+            print("ERROR: Supabase URL, Key, or Service Role Key not found in environment variables.")
+            st.error("Supabase URL, Key, or Service Role Key not found in environment variables. Please configure them.")
             st.stop()
 
         supabase_client_instance = create_client(SUPABASE_URL, SUPABASE_KEY, options=ClientOptions(postgrest_client_timeout=10))
         st.session_state['supabase_client'] = supabase_client_instance
         print("DEBUG: Supabase client initialized successfully and stored in session state.")
         print(f"DEBUG: Session state 'supabase_client' is now: {type(st.session_state['supabase_client'])}")
+
+        # ADDED: Initialize service role client
+        supabase_service_role_client_instance = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, options=ClientOptions(postgrest_client_timeout=10))
+        st.session_state['supabase_service_role_client'] = supabase_service_role_client_instance
+        print("DEBUG: Supabase service role client initialized successfully and stored in session state.")
+        print(f"DEBUG: Session state 'supabase_service_role_client' is now: {type(st.session_state['supabase_service_role_client'])}")
 
     except Exception as e:
         print(f"ERROR: Error during Supabase initialization: {e}")
@@ -365,6 +372,7 @@ else:
     print("DEBUG: 'supabase_client' already exists in session state. Supabase previously initialized.")
 
 supabase = st.session_state['supabase_client']
+# Note: st.session_state['supabase_service_role_client'] is available directly via session state where needed.
 
 # --- Initialize OpenAI client ---
 try:
@@ -383,7 +391,7 @@ except Exception as e:
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@sso.com")
 # Default hash for "adminpass" if not set, for initial setup convenience.
 # In production, this should always be set via environment variable with a strong, generated hash.
-ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH", bcrypt.hashpw("adminpass".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'))
+ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH", bcrypt.hashpw("adminpass".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')) # MODIFIED: Default hash for "adminpass" if not set for initial setup
 
 
 # --- Streamlit Session State Initialization ---
@@ -683,16 +691,19 @@ def register_user(email, password, username):
 
         if response.user:
             user_id = response.user.id
-            # Store user profile in 'users' table
+            # Store user profile in 'users' table using service_role client for direct table access
+            # This bypasses RLS for the insert into 'users' table, which is appropriate here
+            # as the user is not yet fully authenticated in the app context.
             user_data = {
                 'id': user_id,
                 'email': email,
                 'username': username,
                 'created_at': datetime.now().isoformat(), # Use ISO format for Supabase timestamp
-                'isAdmin': False,
-                'firstLoginRequired': True
+                'isadmin': False, # Changed to lowercase 'isadmin'
+                'firstloginrequired': True # Changed to lowercase 'firstloginrequired'
             }
-            supabase.table('users').insert(user_data).execute()
+            # MODIFIED: Use service_role client for direct table access for user creation
+            st.session_state['supabase_service_role_client'].table('users').insert(user_data).execute()
             st.success(f"Account created successfully for {username}! Please check your email to verify and then log in.")
             print(f"DEBUG (register_user): User {username} created and profile saved.")
             time.sleep(2)
@@ -747,13 +758,13 @@ def login_user(email, password, login_as_admin_attempt=False):
 
             if response.user:
                 user_id = response.user.id
-                # Fetch user's data from 'users' table
-                user_data_response = supabase.table('users').select('*').eq('id', user_id).single().execute()
+                # MODIFIED: Fetch user's data from 'users' table using service_role client to bypass RLS for admin check
+                user_data_response = st.session_state['supabase_service_role_client'].table('users').select('isadmin', 'firstloginrequired', 'username').eq('id', user_id).single().execute()
                 user_data = user_data_response.data if user_data_response.data else {}
 
-                is_user_admin_in_db = user_data.get('isAdmin', False)
-                first_login_required = user_data.get('firstLoginRequired', True)
-                print(f"DEBUG (login_user): User {email} data: isAdmin={is_user_admin_in_db}, firstLoginRequired={first_login_required}")
+                is_user_admin_in_db = user_data.get('isadmin', False) # Changed to lowercase 'isadmin'
+                first_login_required = user_data.get('firstloginrequired', True) # Changed to lowercase 'firstloginrequired'
+                print(f"DEBUG (login_user): User {email} data: isadmin={is_user_admin_in_db}, firstloginrequired={first_login_required}")
 
                 if login_as_admin_attempt and not is_user_admin_in_db:
                     st.error("This account does not have administrator privileges. Please log in as a regular user.")
@@ -811,7 +822,7 @@ def logout_user():
     """Logs out the current user by resetting session state and Supabase session."""
     print("DEBUG (logout_user): Initiating logout.")
     try:
-        supabase.auth.sign_out()
+        supabase.auth.sign_out() # Use regular client for logout
         st.session_state['logged_in'] = False
         st.session_state['user_name'] = ''
         st.session_state['user_email'] = ''
@@ -831,165 +842,30 @@ def logout_user():
         st.error(f"Error during logout: {e}")
         print(f"ERROR (logout_user): Error during logout: {e}")
 
-# --- Streamlit Page Functions ---
-def dashboard_page():
-    """Displays the user dashboard."""
-    # Applying color directly with markdown for st.title, as it's not a generic h1 but specific
-    st.markdown(f"<h1 style='color: #0D47A1 !important;'>Welcome, {st.session_state['user_name']}!</h1>", unsafe_allow_html=True)
-    st.write("This is your dashboard. Use the sidebar to navigate.")
-    st.info("To get started, navigate to 'Upload JD & CV' to perform a new AI-powered comparative analysis.")
-    if st.session_state['is_admin']: # Only show for admin
-        st.write("As an admin, you can also check 'Review Reports' to see all past analyses.")
-    print(f"DEBUG (dashboard_page): Displaying dashboard for {st.session_state['user_name']}.") 
-
-def upload_jd_cv_page():
-    """Handles JD and CV uploads, triggers AI review, and displays/downloads results."""
-    st.markdown("<h1 style='color: #0D47A1 !important;'>⬆️ Upload JD & CV for AI Review</h1>", unsafe_allow_html=True)
-    st.write("Upload your Job Description and multiple Candidate CVs to start the comparative analysis.")
-    print("DEBUG (upload_jd_cv_page): Displaying upload page.") 
-
-    uploaded_jd = st.file_uploader("Upload Job Description (PDF, DOCX, TXT)", type=["pdf", "docx", "txt"], key="jd_uploader")
-    uploaded_cvs = st.file_uploader("Upload Candidate's CVs (Multiple - PDF, DOCX, TXT)", type=["pdf", "docx", "txt"], accept_multiple_files=True, key="cv_uploader")
-
-    if st.button("Start AI Review", key="start_review_button"):
-        print("DEBUG (upload_jd_cv_page): 'Start AI Review' button clicked.") 
-        if not uploaded_jd:
-            st.warning("Please upload a Job Description.")
-            return
-        if not uploaded_cvs:
-            st.warning("Please upload at least one Candidate CV.")
-            return
-
-        jd_text = get_file_content(uploaded_jd, uploaded_jd.name)
-        
-        all_candidates_data = []
-        cv_filenames_list = [] 
-        for cv_file in uploaded_cvs:
-            cv_text = get_file_content(cv_file, cv_file.name)
-            if cv_text:
-                all_candidates_data.append({'filename': cv_file.name, 'text': cv_text})
-                cv_filenames_list.append(cv_file.name) 
-            else:
-                st.warning(f"Could not process CV: {cv_file.name}. Skipping it.")
-        
-        if not jd_text:
-            st.error("Failed to extract text from the Job Description.")
-            return
-        if not all_candidates_data:
-            st.error("No valid CVs could be processed for analysis.")
-            return
-
-        st.session_state['review_triggered'] = False 
-        st.session_state['ai_review_result'] = None
-        st.session_state['generated_docx_buffer'] = None
-
-        comparative_results = get_comparative_ai_analysis(jd_text, all_candidates_data)
-
-        if "error" in comparative_results:
-            st.error(f"AI analysis failed: {comparative_results['error']}")
-        else:
-            st.session_state['ai_review_result'] = comparative_results
-            st.success("AI review completed successfully!")
-            print("DEBUG (upload_jd_cv_page): AI review successful. Preparing DOCX.") 
-            
-            st.session_state['jd_filename_for_save'] = uploaded_jd.name
-            st.session_state['cv_filenames_for_save'] = cv_filenames_list 
-
-            st.session_state['generated_docx_buffer'] = generate_docx_report(
-                comparative_results, 
-                st.session_state['jd_filename_for_save'], 
-                ", ".join(st.session_state['cv_filenames_for_save'])
-            )
-            
-            # --- START OF CHATGPT SUGGESTED CHANGE: SAVE TO CLOUD BEFORE DISPLAYING DOWNLOAD BUTTON ---
-            # Generate filename for saving
-            timestamp_str = datetime.now().strftime('%Y%m%d_%H%M%S')
-            download_filename = f"{st.session_state['user_name'].replace(' ', '')}_JD-CV_Comparison_Analysis_{timestamp_str}.docx"
-
-            # Adding extra debug prints
-            print("DEBUG (upload_jd_cv_page): Calling save_report_on_download now...")
-            
-            # ✅ CALL save_report_on_download DIRECTLY here
-            save_report_on_download(
-                download_filename,
-                st.session_state['generated_docx_buffer'],
-                st.session_state['ai_review_result'],
-                st.session_state['jd_filename_for_save'],
-                st.session_state['cv_filenames_for_save']
-            )
-            print("DEBUG (upload_jd_cv_page): save_report_on_download call completed.")
-            # --- END OF CHATGPT SUGGESTED CHANGE ---
-
-            st.session_state['review_triggered'] = True 
-
-    if st.session_state['review_triggered'] and st.session_state['ai_review_result']:
-        print("DEBUG (upload_jd_cv_page): Displaying AI review results section.") 
-        comparative_results = st.session_state['ai_review_result']
-
-        st.subheader("AI Review Results:")
-
-        candidate_evaluations_data = comparative_results.get("candidate_evaluations", [])
-        if candidate_evaluations_data:
-            st.markdown("### 🧾 Candidate Evaluation Table")
-            df_evaluations = pd.DataFrame(candidate_evaluations_data)
-            expected_cols_eval = ["Candidate Name", "Match %", "Ranking", "Shortlist Probability", "Key Strengths", "Key Gaps", "Location Suitability", "Comments"]
-            for col in expected_cols_eval:
-                if col not in df_evaluations.columns:
-                    df_evaluations[col] = "N/A"
-            df_evaluations = df_evaluations[expected_cols_eval]
-
-            st.dataframe(df_evaluations, use_container_width=True, hide_index=True)
-        
-        criteria_observations_data = comparative_results.get("criteria_observations", [])
-        if criteria_observations_data:
-            st.markdown("### ✅ Additional Observations (Criteria Comparison)")
-            df_criteria = pd.DataFrame(criteria_observations_data)
-            st.dataframe(df_criteria, use_container_width=True, hide_index=True)
-
-        additional_observations_text = comparative_results.get("additional_observations_text", "No general observations provided.")
-        if additional_observations_text and additional_observations_text.strip() not in ["No general observations provided.", ""]:
-            st.markdown("### General Observations")
-            st.write(additional_observations_text)
-
-        final_shortlist_recommendation = comparative_results.get("final_shortlist_recommendation", "No final recommendation provided.")
-        if final_shortlist_recommendation and final_shortlist_recommendation.strip() not in ["No final recommendation provided.", ""]:
-            st.markdown("### 📌 Final Shortlist Recommendation")
-            st.write(final_shortlist_recommendation)
-
-        st.markdown("---") 
-
-        st.subheader("Download & Save Report")
-        
-        # --- START OF CHATGPT SUGGESTED CHANGE (Modified download button structure) ---
-        # No more on_click for save_report_on_download here as it's called earlier
-        if st.session_state['generated_docx_buffer']:
-            st.download_button(
-                label="Download DOCX Report ⬇️", # Label changed for clarity
-                data=st.session_state['generated_docx_buffer'],
-                file_name=download_filename, # Use the same filename generated for saving
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
-                key="download_docx_only" # New key for this button
-            )
-        else:
-            st.warning("Run an AI review to generate a report for download and save.")
-        # --- END OF CHATGPT SUGGESTED CHANGE ---
-
-
 # --- Supabase Storage & Database Functions ---
 
-def upload_file_to_supabase(file_bytes, file_name, user_uid):
-    """Uploads a file to Supabase Storage and returns its public URL."""
+def upload_file_to_supabase(file_bytes, file_name, user_uid): # MODIFIED: Added user_uid parameter
+    """Uploads a file to Supabase Storage and returns its public URL.
+    Uses service_role client if user_uid is 'admin_special_uid'."""
     try:
-        bucket_name = "app-files" # Ensure this bucket exists in your Supabase Storage
+        bucket_name = "app_files" # MODIFIED: Ensure this bucket exists in your Supabase Storage (using underscore)
         # Use a unique path for each file, including user_uid for organization
         file_path_in_storage = f"jd_cv_reports/{user_uid}/{file_name}"
 
-        # Upload the file
-        response = supabase.storage.from_(bucket_name).upload(file_path_in_storage, file_bytes)
+        # ADDED: Determine which client to use for upload (regular for users, service_role for hardcoded admin)
+        if user_uid == "admin_special_uid":
+            supabase_target_client = st.session_state['supabase_service_role_client']
+            print("DEBUG (upload_file_to_supabase): Using service role client for hardcoded admin upload.")
+        else:
+            supabase_target_client = st.session_state['supabase_client']
+            print("DEBUG (upload_file_to_supabase): Using regular client for user upload.")
+
+        # MODIFIED: Use the determined client for upload
+        response = supabase_target_client.storage.from_(bucket_name).upload(file_path_in_storage, file_bytes)
 
         if response.status_code in [200, 201]: # 200 for existing, 201 for new
             # Get public URL
-            public_url_response = supabase.storage.from_(bucket_name).get_public_url(file_path_in_storage)
+            public_url_response = supabase_target_client.storage.from_(bucket_name).get_public_url(file_path_in_storage)
             return public_url_response
         else:
             st.error(f"Supabase Storage upload failed: {response.status_code} - {response.json()}")
@@ -1000,11 +876,22 @@ def upload_file_to_supabase(file_bytes, file_name, user_uid):
         print(f"ERROR (upload_file_to_supabase): {e}")
         return None
 
-def delete_file_from_supabase_storage(file_path_in_storage):
-    """Deletes a file from Supabase Storage."""
+def delete_file_from_supabase_storage(file_path_in_storage, user_uid_for_deletion_check): # MODIFIED: Added user_uid_for_deletion_check parameter
+    """Deletes a file from Supabase Storage.
+    Uses service_role client if user_uid_for_deletion_check is 'admin_special_uid'."""
     try:
-        bucket_name = "app-files"
-        response = supabase.storage.from_(bucket_name).remove([file_path_in_storage])
+        bucket_name = "app_files" # MODIFIED: Using underscore
+
+        # ADDED: Determine which client to use for deletion
+        if user_uid_for_deletion_check == "admin_special_uid":
+            supabase_target_client = st.session_state['supabase_service_role_client']
+            print("DEBUG (delete_file_from_supabase_storage): Using service role client for admin deletion.")
+        else:
+            supabase_target_client = st.session_state['supabase_client']
+            print("DEBUG (delete_file_from_supabase_storage): Using regular client for user deletion.")
+
+        # MODIFIED: Use the determined client for removal
+        response = supabase_target_client.storage.from_(bucket_name).remove([file_path_in_storage])
         if response.status_code == 200:
             return True
         else:
@@ -1031,6 +918,7 @@ def save_report_on_download(filename, docx_buffer, ai_result, jd_original_name, 
         print(f"DEBUG (save_report_on_download): Attempting to upload file to Storage at: {storage_file_path}")
         docx_buffer.seek(0)
         file_bytes = docx_buffer.getvalue()
+        # MODIFIED: Pass user_uid to upload_file_to_supabase to determine client
         download_url = upload_file_to_supabase(file_bytes, filename, st.session_state['user_uid'])
 
         if download_url:
@@ -1044,15 +932,22 @@ def save_report_on_download(filename, docx_buffer, ai_result, jd_original_name, 
                 "jd_filename": jd_original_name,
                 "cv_filenames": json.dumps(cv_original_names), # Store list as JSON string
                 "review_date": datetime.now().isoformat(), # Use ISO format for Supabase timestamp
-                "outputDocFileName": filename,
-                "outputDocURL": download_url,
+                "outputdocfilename": filename, # Changed to lowercase 'outputdocfilename'
+                "outputdocurl": download_url, # Changed to lowercase 'outputdocurl'
                 "summary": ai_result.get("final_shortlist_recommendation", "No summary provided.")
             }
             print(f"DEBUG (save_report_on_download): Prepared Supabase table metadata: {report_metadata}")
 
             try:
                 print("DEBUG (save_report_on_download): About to attempt saving metadata to Supabase table 'jd_cv_reports'...")
-                response = supabase.table('jd_cv_reports').insert(report_metadata).execute()
+                # ADDED: Use service_role client for hardcoded admin to insert report metadata
+                if st.session_state['user_uid'] == "admin_special_uid":
+                    print("DEBUG (save_report_on_download): Using service role client for admin metadata insert.")
+                    response = st.session_state['supabase_service_role_client'].table('jd_cv_reports').insert(report_metadata).execute()
+                else:
+                    print("DEBUG (save_report_on_download): Using regular client for user metadata insert.")
+                    response = supabase.table('jd_cv_reports').insert(report_metadata).execute()
+
                 if response.data:
                     st.success("Report metadata saved to Supabase successfully!")
                     print("DEBUG (save_report_on_download): Report metadata successfully added to Supabase.")
@@ -1060,16 +955,16 @@ def save_report_on_download(filename, docx_buffer, ai_result, jd_original_name, 
                     st.error(f"Supabase metadata save failed: {response.json()}")
                     print(f"ERROR (save_report_on_download): Supabase metadata save failed: {response.json()}")
                     if download_url:
-                        # Attempt to delete file from storage if metadata save fails
-                        delete_file_from_supabase_storage(storage_file_path)
+                        # MODIFIED: Pass user_uid to delete_file_from_supabase_storage
+                        delete_file_from_supabase_storage(storage_file_path, st.session_state['user_uid'])
                         print("DEBUG: Deleted file from Storage due to metadata save failure.")
 
             except Exception as generic_e: # Catching general Exception
                 st.error(f"An unexpected error occurred during Supabase metadata save: {generic_e}.")
                 print(f"ERROR (save_report_on_download): Generic error during Supabase metadata save: {generic_e}")
                 if download_url:
-                    # Attempt to delete file from storage if metadata save fails
-                    delete_file_from_supabase_storage(storage_file_path)
+                    # MODIFIED: Pass user_uid to delete_file_from_supabase_storage
+                    delete_file_from_supabase_storage(storage_file_path, st.session_state['user_uid'])
                     print("DEBUG: Deleted file from Storage due to generic metadata save failure.")
         else:
             st.error("File upload to Supabase Storage failed, so metadata was not saved.")
@@ -1097,11 +992,16 @@ def review_reports_page():
 
     try:
         print(f"DEBUG (review_reports_page): Fetching reports for UID: {st.session_state['user_uid']}")
-        # Querying reports for the current user, ordered by review_date
-        # Supabase doesn't have direct 'order_by' on the Python client for all queries like Firestore
-        # You fetch and then sort, or rely on RLS and database views/functions if complex.
-        # For simple cases, you can sort after fetching.
-        response = supabase.table('jd_cv_reports').select('*').eq('user_uid', st.session_state['user_uid']).execute()
+        # ADDED: Determine which client to use for fetching reports
+        if st.session_state['user_uid'] == "admin_special_uid":
+            # Hardcoded admin can view all reports using service_role client
+            response = st.session_state['supabase_service_role_client'].table('jd_cv_reports').select('*').execute()
+            print("DEBUG (review_reports_page): Admin viewing all reports using service role client.")
+        else:
+            # Regular user views only their own reports (RLS applies)
+            response = supabase.table('jd_cv_reports').select('*').eq('user_uid', st.session_state['user_uid']).execute()
+            print("DEBUG (review_reports_page): User viewing own reports using regular client.")
+
         reviews_data = response.data if response.data else []
 
         # Sort by review_date in descending order (assuming review_date is ISO format string)
@@ -1112,12 +1012,12 @@ def review_reports_page():
             cv_filenames = json.loads(report.get('cv_filenames', '[]')) if isinstance(report.get('cv_filenames'), str) else report.get('cv_filenames', [])
             processed_reviews_data.append({
                 "Report ID": report.get('id', 'N/A'), # Assuming 'id' is the primary key in Supabase table
-                "Report Name": report.get('outputDocFileName', 'N/A'),
+                "Report Name": report.get('outputdocfilename', 'N/A'), # Changed to lowercase
                 "Job Description": report.get('jd_filename', 'N/A'),
                 "Candidates": ", ".join(cv_filenames),
                 "Date Generated": datetime.fromisoformat(report['review_date']).strftime('%Y-%m-%d %H:%M:%S') if report.get('review_date') else 'N/A',
                 "Summary": report.get('summary', 'No summary provided.'),
-                "Download Link": report.get('outputDocURL', '')
+                "Download Link": report.get('outputdocurl', '') # Changed to lowercase
             })
 
         if processed_reviews_data:
@@ -1151,15 +1051,16 @@ def admin_user_management_page():
     st.write("View, manage roles, or delete users.")
     print("DEBUG (admin_user_management_page): Displaying user management page.")
 
-    if supabase is None:
-        print("ERROR: admin_user_management_page called but 'supabase' is None.")
+    if st.session_state['supabase_service_role_client'] is None: # MODIFIED: Use service client for admin pages
+        print("ERROR: admin_user_management_page called but 'supabase_service_role_client' is None.")
         st.error("Application error: Database connection not established. Please refresh or contact support.")
         return
 
     users_data = []
     try:
-        print(f"DEBUG (admin_user_management_page): Fetching all users from Supabase 'users' table.")
-        response = supabase.table('users').select('*').execute()
+        print(f"DEBUG (admin_user_management_page): Fetching all users from Supabase 'users' table using service role client.")
+        # MODIFIED: Use service_role client
+        response = st.session_state['supabase_service_role_client'].table('users').select('*').execute()
         users_from_db = response.data if response.data else []
 
         for user_info in users_from_db:
@@ -1167,7 +1068,7 @@ def admin_user_management_page():
                 "UID": user_info.get('id', 'N/A'),
                 "Username": user_info.get('username', 'N/A'),
                 "Email": user_info.get('email', 'N/A'),
-                "Is Admin": user_info.get('isAdmin', False)
+                "Is Admin": user_info.get('isadmin', False) # Changed to lowercase 'isadmin'
             })
 
         if users_data:
@@ -1187,22 +1088,22 @@ def admin_user_management_page():
                     if user_email_toggle:
                         try:
                             print(f"DEBUG (admin_user_management_page): Toggling admin status for {user_email_toggle}.")
-                            # Fetch user from Supabase Auth to get UID
-                            auth_user_response = supabase.auth.admin.get_user_by_email(user_email_toggle)
+                            # MODIFIED: Fetch user from Supabase Auth to get UID using admin client
+                            auth_user_response = st.session_state['supabase_service_role_client'].auth.admin.get_user_by_email(user_email_toggle)
                             user_record = auth_user_response.user
 
                             if user_record:
-                                # Fetch user data from 'users' table
-                                user_data_response = supabase.table('users').select('isAdmin').eq('id', user_record.id).single().execute()
+                                # MODIFIED: Fetch user data from 'users' table using service client
+                                user_data_response = st.session_state['supabase_service_role_client'].table('users').select('isadmin').eq('id', user_record.id).single().execute()
                                 user_data = user_data_response.data if user_data_response.data else {}
-                                current_admin_status = user_data.get('isAdmin', False)
+                                current_admin_status = user_data.get('isadmin', False) # Changed to lowercase 'isadmin'
 
                                 if user_record.id == st.session_state['user_uid'] and current_admin_status:
                                     st.error("You cannot revoke your own administrator privileges.")
                                     print("DEBUG (admin_user_management_page): Self-revocation attempt blocked.")
                                 else:
-                                    # Update 'isAdmin' in the 'users' table
-                                    supabase.table('users').update({'isAdmin': not current_admin_status}).eq('id', user_record.id).execute()
+                                    # MODIFIED: Update 'isadmin' in the 'users' table using service client
+                                    st.session_state['supabase_service_role_client'].table('users').update({'isadmin': not current_admin_status}).eq('id', user_record.id).execute()
                                     st.success(f"Admin status for {user_email_toggle} toggled to {not current_admin_status}.")
                                     print(f"DEBUG (admin_user_management_page): Admin status for {user_email_toggle} set to {not current_admin_status}.")
                                     time.sleep(1)
@@ -1227,32 +1128,34 @@ def admin_user_management_page():
                         else:
                             try:
                                 print(f"DEBUG (admin_user_management_page): Deleting user {user_email_delete}.")
-                                # Get user UID from Supabase Auth
-                                auth_user_response = supabase.auth.admin.get_user_by_email(user_email_delete)
+                                # MODIFIED: Get user UID from Supabase Auth using admin client
+                                auth_user_response = st.session_state['supabase_service_role_client'].auth.admin.get_user_by_email(user_email_delete)
                                 user_record = auth_user_response.user
                                 user_uid_to_delete = user_record.id
 
-                                # 1. Delete associated files from Storage
+                                # MODIFIED: Delete associated files from Storage using service client
                                 # Need to fetch reports first to get file paths
-                                reports_response = supabase.table('jd_cv_reports').select('outputDocFileName').eq('user_uid', user_uid_to_delete).execute()
+                                # MODIFIED: Use service_role client and lowercase column name
+                                reports_response = st.session_state['supabase_service_role_client'].table('jd_cv_reports').select('outputdocfilename').eq('user_uid', user_uid_to_delete).execute()
                                 if reports_response.data:
                                     for report_data in reports_response.data:
-                                        storage_file_path = f"jd_cv_reports/{user_uid_to_delete}/{report_data['outputDocFileName']}"
-                                        if delete_file_from_supabase_storage(storage_file_path):
+                                        storage_file_path = f"jd_cv_reports/{user_uid_to_delete}/{report_data['outputdocfilename']}" # Changed to lowercase
+                                        # MODIFIED: Pass "admin_special_uid" to ensure service client is used for deletion
+                                        if delete_file_from_supabase_storage(storage_file_path, "admin_special_uid"):
                                             print(f"DEBUG (admin_user_management_page): Deleted Storage file: {storage_file_path}.")
                                         else:
-                                            st.warning(f"Could not delete storage file for {user_email_delete}: {report_data['outputDocFileName']}.")
+                                            st.warning(f"Could not delete storage file for {user_email_delete}: {report_data['outputdocfilename']}.")
 
-                                # 2. Delete reports from 'jd_cv_reports' table
-                                supabase.table('jd_cv_reports').delete().eq('user_uid', user_uid_to_delete).execute()
+                                # MODIFIED: Delete reports from 'jd_cv_reports' table using service client
+                                st.session_state['supabase_service_role_client'].table('jd_cv_reports').delete().eq('user_uid', user_uid_to_delete).execute()
                                 print(f"DEBUG (admin_user_management_page): Deleted reports for user {user_email_delete} from 'jd_cv_reports' table.")
 
-                                # 3. Delete user from 'users' table
-                                supabase.table('users').delete().eq('id', user_uid_to_delete).execute()
+                                # MODIFIED: Delete user from 'users' table using service client
+                                st.session_state['supabase_service_role_client'].table('users').delete().eq('id', user_uid_to_delete).execute()
                                 print(f"DEBUG (admin_user_management_page): Deleted user {user_email_delete} from 'users' table.")
 
-                                # 4. Delete user from Supabase Auth
-                                supabase.auth.admin.delete_user(user_uid_to_delete)
+                                # MODIFIED: Delete user from Supabase Auth using admin client
+                                st.session_state['supabase_service_role_client'].auth.admin.delete_user(user_uid_to_delete)
                                 st.success(f"User {user_email_delete} and all their associated data deleted successfully.")
                                 print(f"DEBUG (admin_user_management_page): User {user_email_delete} fully deleted.")
                                 time.sleep(1)
@@ -1278,16 +1181,16 @@ def admin_report_management_page():
     st.write("View and delete all AI-generated comparative analysis reports.")
     print("DEBUG (admin_report_management_page): Displaying report management page.")
 
-    if supabase is None:
-        print("ERROR: admin_report_management_page called but 'supabase' is None.")
+    if st.session_state['supabase_service_role_client'] is None: # MODIFIED: Use service client for admin pages
+        print("ERROR: admin_report_management_page called but 'supabase_service_role_client' is None.")
         st.error("Application error: Database connection not established. Please refresh or contact support.")
         return
 
     all_reports_data = []
     try:
-        print(f"DEBUG (admin_report_management_page): Fetching all reports from Supabase 'jd_cv_reports' table.")
-        # Fetching all reports, then sort by review_date in descending order
-        response = supabase.table('jd_cv_reports').select('*').execute()
+        print(f"DEBUG (admin_report_management_page): Fetching all reports from Supabase 'jd_cv_reports' table using service role client.")
+        # MODIFIED: Fetching all reports using service_role client
+        response = st.session_state['supabase_service_role_client'].table('jd_cv_reports').select('*').execute()
         all_reports_raw = response.data if response.data else []
         all_reports_raw.sort(key=lambda x: x.get('review_date', ''), reverse=True)
 
@@ -1295,14 +1198,14 @@ def admin_report_management_page():
             cv_filenames = json.loads(report_info.get('cv_filenames', '[]')) if isinstance(report_info.get('cv_filenames'), str) else report_info.get('cv_filenames', [])
             all_reports_data.append({
                 "Report ID": report_info.get('id', 'N/A'),
-                "Report Name": report_info.get('outputDocFileName', 'N/A'),
+                "Report Name": report_info.get('outputdocfilename', 'N/A'), # Changed to lowercase
                 "Uploaded By": report_info.get('user_name', 'N/A'),
                 "Uploader Email": report_info.get('user_email', 'N/A'),
                 "JD Filename": report_info.get('jd_filename', 'N/A'),
                 "CV Filenames": ", ".join(cv_filenames),
                 "Date Generated": datetime.fromisoformat(report_info['review_date']).strftime('%Y-%m-%d %H:%M:%S') if report_info.get('review_date') else 'N/A',
                 "Summary": report_info.get('summary', 'No summary provided.'),
-                "Download Link": report_info.get('outputDocURL', '')
+                "Download Link": report_info.get('outputdocurl', '') # Changed to lowercase
             })
 
         if all_reports_data:
@@ -1323,22 +1226,27 @@ def admin_report_management_page():
                 if report_id_to_delete:
                     try:
                         print(f"DEBUG (admin_report_management_page): Deleting report {report_id_to_delete}.")
-                        report_response = supabase.table('jd_cv_reports').select('outputDocFileName', 'user_uid').eq('id', report_id_to_delete).single().execute()
+                        # MODIFIED: Fetch report data using service client
+                        # MODIFIED: Use service_role client and lowercase column name
+                        report_response = st.session_state['supabase_service_role_client'].table('jd_cv_reports').select('outputdocfilename', 'user_uid').eq('id', report_id_to_delete).single().execute()
                         report_data = report_response.data if report_response.data else None
 
                         if report_data:
-                            storage_file_path = f"jd_cv_reports/{report_data['user_uid']}/{report_data['outputDocFileName']}"
+                            storage_file_path = f"jd_cv_reports/{report_data['user_uid']}/{report_data['outputdocfilename']}" # Changed to lowercase
 
-                            if delete_file_from_supabase_storage(storage_file_path):
-                                st.success(f"File '{report_data['outputDocFileName']}' deleted from Storage.")
+                            # MODIFIED: Delete file from storage using service client
+                            # MODIFIED: Pass "admin_special_uid" to ensure service client is used for deletion
+                            if delete_file_from_supabase_storage(storage_file_path, "admin_special_uid"):
+                                st.success(f"File '{report_data['outputdocfilename']}' deleted from Storage.")
                                 print(f"DEBUG (admin_report_management_page): Deleted Storage file: {storage_file_path}.")
                             else:
                                 st.warning(f"Could not delete storage file for report ID {report_id_to_delete}.")
 
-                            response = supabase.table('jd_cv_reports').delete().eq('id', report_id_to_delete).execute()
+                            # MODIFIED: Delete report metadata from table using service client
+                            response = st.session_state['supabase_service_role_client'].table('jd_cv_reports').delete().eq('id', report_id_to_delete).execute()
                             if response.data:
                                 st.success(f"Report '{report_id_to_delete}' deleted from Supabase table.")
-                                print(f"DEBUG (admin_report_management_page): Supabase table deletion failed: {response.json()}")
+                                print(f"DEBUG (admin_report_management_page): Supabase table deletion successful: {report_id_to_delete}.") # Corrected log message
                             else:
                                 st.error(f"Failed to delete report from Supabase table: {response.json()}")
                                 print(f"ERROR (admin_report_management_page): Supabase table deletion failed: {response.json()}")
@@ -1368,8 +1276,8 @@ def admin_invite_member_page():
     st.write("Create new user accounts directly and assign their initial role.")
     print("DEBUG (admin_invite_member_page): Displaying invite member page.")
 
-    if supabase is None:
-        print("ERROR: admin_invite_member_page called but 'supabase' is None.")
+    if st.session_state['supabase_service_role_client'] is None: # MODIFIED: Use service client for admin pages
+        print("ERROR: admin_invite_member_page called but 'supabase_service_role_client' is None.")
         st.error("Application error: Database connection not established. Please refresh or contact support.")
         return
 
@@ -1421,23 +1329,23 @@ def admin_invite_member_page():
             try:
                 with st.spinner("Inviting new member..."):
                     print(f"DEBUG (admin_invite_member_page): Attempting to create user {new_user_email_input} with role {assign_role}.")
-                    # Create user in Supabase Auth
-                    response = supabase.auth.admin.create_user(
+                    # MODIFIED: Create user in Supabase Auth using service client
+                    response = st.session_state['supabase_service_role_client'].auth.admin.create_user(
                         {"email": new_user_email_input, "password": new_user_password_input, "email_confirm": True} # Set email_confirm to True for verification
                     )
                     user_record = response.user
 
                     if user_record:
-                        # Save user profile in 'users' table
+                        # MODIFIED: Save user profile in 'users' table using service client
                         user_data = {
                             'id': user_record.id,
                             'email': new_user_email_input,
                             'username': new_username_input,
                             'created_at': datetime.now().isoformat(),
-                            'isAdmin': is_admin_new_user,
-                            'firstLoginRequired': True
+                            'isadmin': is_admin_new_user, # Changed to lowercase
+                            'firstloginrequired': True # Changed to lowercase
                         }
-                        supabase.table('users').insert(user_data).execute()
+                        st.session_state['supabase_service_role_client'].table('users').insert(user_data).execute()
 
                         status_message_placeholder.success(f"New user '{new_username_input}' ({new_user_email_input}) created successfully with role: {assign_role}! They will need to verify their email.")
                         print(f"DEBUG (admin_invite_member_page): User {new_user_email_input} created in Auth and 'users' table.")
@@ -1525,11 +1433,11 @@ def update_password_page():
                         # Now that the user is authenticated with the temp password, update their password
                         update_response = supabase.auth.update_user({"password": new_password})
                         if update_response.user:
-                            # Update firstLoginRequired status in 'users' table
-                            supabase.table('users').update({'firstLoginRequired': False}).eq('id', st.session_state['new_user_uid_for_pw_reset']).execute()
+                            # MODIFIED: Update firstloginrequired status in 'users' table using service client
+                            st.session_state['supabase_service_role_client'].table('users').update({'firstloginrequired': False}).eq('id', st.session_state['new_user_uid_for_pw_reset']).execute()
 
                             update_status_placeholder.success("Password updated successfully! Please log in with your new password.")
-                            print("DEBUG (update_password_page): Password updated and firstLoginRequired set to False.")
+                            print("DEBUG (update_password_page): Password updated and firstloginrequired set to False.")
                             time.sleep(2)
                             logout_user() # Log out to force re-login with new password
                         else:
