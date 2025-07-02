@@ -993,56 +993,69 @@ def upload_file_to_supabase(file_bytes, file_name, user_uid):
     Uses service_role client if user_uid is 'admin_special_uid'.
     """
     try:
-        bucket_name = "app-files" # MODIFIED: Ensure this bucket exists in your Supabase Storage
-        # Use a unique path for each file, including user_uid for organization
+        bucket_name = "app-files" # Ensure this bucket exists in your Supabase Storage
         file_path_in_storage = f"jd_cv_reports/{user_uid}/{file_name}"
 
-        # Determine which client to use for upload (regular for users, service_role for hardcoded admin)
         if user_uid == "admin_special_uid":
-            # Ensure 'supabase_service_role_client' is properly initialized in st.session_state
             if 'supabase_service_role_client' not in st.session_state:
                 st.error("Supabase service role client not initialized.")
                 return None
             supabase_target_client = st.session_state['supabase_service_role_client']
             print("DEBUG (upload_file_to_supabase): Using service role client for hardcoded admin upload.")
         else:
-            # Ensure 'supabase_client' is properly initialized in st.session_state
             if 'supabase_client' not in st.session_state:
                 st.error("Supabase client not initialized.")
                 return None
             supabase_target_client = st.session_state['supabase_client']
             print("DEBUG (upload_file_to_supabase): Using regular client for user upload.")
 
-        # Perform the upload
-        # The upload method returns a dictionary with 'data' and 'error' keys.
+        # Perform the upload.
+        # In some versions of supabase-py, this returns an UploadResponse object
+        # with 'data' and 'error' as attributes.
         response = supabase_target_client.storage.from_(bucket_name).upload(
             file_path_in_storage,
             file_bytes,
-            # You might want to add content-type here if known, e.g., {"content-type": "application/pdf"}
-            # For this example, we'll assume it's handled or not strictly necessary for simple files.
-            # However, for proper browser handling, it's recommended.
-            # Example: options={"contentType": "application/octet-stream"}
+            # It's good practice to specify content-type if known
+            # options={"contentType": "application/octet-stream"}
         )
 
-        # Check if there's an error in the response
-        if response.get("error"):
-            error_message = response["error"].get("message", "Unknown error")
+        # Check for error attribute on the response object
+        if response.error: # Access 'error' as an attribute
+            error_message = response.error.message if hasattr(response.error, 'message') else "Unknown error"
             st.error(f"Supabase Storage upload failed: {error_message}")
             print(f"ERROR (upload_file_to_supabase): Upload failed: {error_message}")
             return None
         else:
             # Upload was successful, now get the public URL
-            # The get_public_url method also returns a dictionary with 'data' and 'error'
+            # The get_public_url method also returns an object, often with a 'data' attribute
             public_url_response = supabase_target_client.storage.from_(bucket_name).get_public_url(file_path_in_storage)
 
-            if public_url_response.get("error"):
-                error_message = public_url_response["error"].get("message", "Unknown error")
+            # Check for error attribute on the public_url_response object
+            if public_url_response.error: # Access 'error' as an attribute
+                error_message = public_url_response.error.message if hasattr(public_url_response.error, 'message') else "Unknown error"
                 st.error(f"Failed to get public URL: {error_message}")
                 print(f"ERROR (upload_file_to_supabase): Failed to get public URL: {error_message}")
                 return None
             else:
-                # The public URL is directly in public_url_response['data']
-                return public_url_response['data'] # This will be the actual URL string
+                # The public URL is typically in the 'data' attribute of the public_url_response object
+                # and then often as a 'publicUrl' key within that data.
+                # Let's be explicit and check if 'data' exists and then if 'publicUrl' is in it.
+                if hasattr(public_url_response, 'data') and public_url_response.data:
+                    # In some versions, public_url_response.data is directly the URL string.
+                    # In others, it's an object like {'publicUrl': '...'}.
+                    # We'll try to handle both.
+                    if isinstance(public_url_response.data, str):
+                        return public_url_response.data
+                    elif isinstance(public_url_response.data, dict) and 'publicUrl' in public_url_response.data:
+                        return public_url_response.data['publicUrl']
+                    else:
+                        st.error("Could not extract public URL from Supabase response.")
+                        print(f"ERROR (upload_file_to_supabase): Unexpected public URL response data: {public_url_response.data}")
+                        return None
+                else:
+                    st.error("Public URL data not found in Supabase response.")
+                    print(f"ERROR (upload_file_to_supabase): Public URL response missing data: {public_url_response}")
+                    return None
 
     except Exception as e:
         st.error(f"An unexpected error occurred during file upload to Supabase Storage: {e}")
@@ -1057,16 +1070,13 @@ def delete_file_from_supabase_storage(file_path_in_storage, user_uid_for_deletio
     try:
         bucket_name = "app-files" # Ensure this bucket exists in your Supabase Storage
 
-        # Determine which client to use for deletion
         if user_uid_for_deletion_check == "admin_special_uid":
-            # Ensure 'supabase_service_role_client' is properly initialized in st.session_state
             if 'supabase_service_role_client' not in st.session_state:
                 st.error("Supabase service role client not initialized for deletion.")
                 return False
             supabase_target_client = st.session_state['supabase_service_role_client']
             print("DEBUG (delete_file_from_supabase_storage): Using service role client for admin deletion.")
         else:
-            # Ensure 'supabase_client' is properly initialized in st.session_state
             if 'supabase_client' not in st.session_state:
                 st.error("Supabase client not initialized for deletion.")
                 return False
@@ -1074,19 +1084,19 @@ def delete_file_from_supabase_storage(file_path_in_storage, user_uid_for_deletio
             print("DEBUG (delete_file_from_supabase_storage): Using regular client for user deletion.")
 
         # Perform the removal. The remove method expects a list of file paths.
-        # It returns a dictionary with 'data' and 'error' keys.
+        # It returns an object with 'data' and 'error' as attributes.
         response = supabase_target_client.storage.from_(bucket_name).remove([file_path_in_storage])
 
-        # Check if there's an error in the response
-        if response.get("error"):
-            error_message = response["error"].get("message", "Unknown error")
+        # Check for error attribute on the response object
+        if response.error: # Access 'error' as an attribute
+            error_message = response.error.message if hasattr(response.error, 'message') else "Unknown error"
             st.error(f"Supabase Storage deletion failed: {error_message}")
             print(f"ERROR (delete_file_from_supabase_storage): Deletion failed: {error_message}")
             return False
         else:
             # If no error, the deletion was successful.
-            # The 'data' key might contain a list of objects with 'name' and 'id' of deleted files.
-            print(f"DEBUG (delete_file_from_supabase_storage): File(s) successfully deleted: {response.get('data')}")
+            # The 'data' attribute might contain a list of objects with 'name' and 'id' of deleted files.
+            print(f"DEBUG (delete_file_from_supabase_storage): File(s) successfully deleted: {response.data}")
             return True
 
     except Exception as e:
