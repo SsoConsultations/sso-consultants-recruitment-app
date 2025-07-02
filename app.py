@@ -1019,6 +1019,16 @@ def upload_file_to_supabase(file_bytes, file_name, user_uid):
             # options={"contentType": "application/octet-stream"}
         )
 
+        print(f"DEBUG: Raw response object from upload(): {response}")
+        print(f"DEBUG: Type of response object from upload(): {type(response)}")
+        print(f"DEBUG: Does response have 'error' attribute? {hasattr(response, 'error')}")
+        if hasattr(response, 'error'):
+            print(f"DEBUG: Value of response.error: {response.error}")
+        print(f"DEBUG: Does response have 'data' attribute? {hasattr(response, 'data')}")
+        if hasattr(response, 'data'):
+            print(f"DEBUG: Value of response.data: {response.data}")
+            print(f"DEBUG: Type of response.data: {type(response.data)}")
+
         # First, check if the response object itself indicates an error
         # This handles cases where 'response' might be an error object directly, or have an 'error' attribute.
         # We use isinstance(response, dict) to check if it's a dictionary-like response,
@@ -1043,6 +1053,16 @@ def upload_file_to_supabase(file_bytes, file_name, user_uid):
             # Upload was successful, now get the public URL
             # The get_public_url method also returns an object, often with a 'data' attribute
             public_url_response = supabase_target_client.storage.from_(bucket_name).get_public_url(file_path_in_storage)
+
+            print(f"DEBUG: Raw public_url_response object: {public_url_response}")
+            print(f"DEBUG: Type of public_url_response object: {type(public_url_response)}")
+            print(f"DEBUG: Does public_url_response have 'error' attribute? {hasattr(public_url_response, 'error')}")
+            if hasattr(public_url_response, 'error'):
+                print(f"DEBUG: Value of public_url_response.error: {public_url_response.error}")
+            print(f"DEBUG: Does public_url_response have 'data' attribute? {hasattr(public_url_response, 'data')}")
+            if hasattr(public_url_response, 'data'):
+                print(f"DEBUG: Value of public_url_response.data: {public_url_response.data}")
+                print(f"DEBUG: Type of public_url_response.data: {type(public_url_response.data)}")
 
             # Apply the same robust error checking for public_url_response
             if isinstance(public_url_response, dict) and public_url_response.get("error"):
