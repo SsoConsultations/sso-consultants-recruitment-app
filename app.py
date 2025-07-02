@@ -1010,8 +1010,8 @@ def upload_file_to_supabase(file_bytes, file_name, user_uid):
             print("DEBUG (upload_file_to_supabase): Using regular client for user upload.")
 
         # Perform the upload.
-        # In some versions of supabase-py, this returns an UploadResponse object
-        # with 'data' and 'error' as attributes.
+        # This is the most robust way to handle varying response types:
+        # Check if 'error' attribute exists. If it does, and it's not None, then it's an error.
         response = supabase_target_client.storage.from_(bucket_name).upload(
             file_path_in_storage,
             file_bytes,
@@ -1019,42 +1019,58 @@ def upload_file_to_supabase(file_bytes, file_name, user_uid):
             # options={"contentType": "application/octet-stream"}
         )
 
-        # Check for error attribute on the response object
-        if response.error: # Access 'error' as an attribute
-            error_message = response.error.message if hasattr(response.error, 'message') else "Unknown error"
-            st.error(f"Supabase Storage upload failed: {error_message}")
-            print(f"ERROR (upload_file_to_supabase): Upload failed: {error_message}")
+        # First, check if the response object itself indicates an error
+        # This handles cases where 'response' might be an error object directly, or have an 'error' attribute.
+        # We use isinstance(response, dict) to check if it's a dictionary-like response,
+        # and hasattr(response, 'error') to check for an error attribute.
+        if isinstance(response, dict) and response.get("error"):
+            error_obj = response["error"]
+            error_message = error_obj.get("message", "Unknown error from dict response") if isinstance(error_obj, dict) else str(error_obj)
+            st.error(f"Supabase Storage upload failed (dict error): {error_message}")
+            print(f"ERROR (upload_file_to_supabase): Upload failed (dict error): {error_message}")
+            return None
+        elif hasattr(response, 'error') and response.error:
+            error_message = response.error.message if hasattr(response.error, 'message') else "Unknown error from attribute error"
+            st.error(f"Supabase Storage upload failed (attribute error): {error_message}")
+            print(f"ERROR (upload_file_to_supabase): Upload failed (attribute error): {error_message}")
+            return None
+        elif not hasattr(response, 'data') or not response.data:
+            # This covers cases where there's no explicit error, but also no data (indicating failure)
+            st.error("Supabase Storage upload failed: No data returned and no explicit error.")
+            print(f"ERROR (upload_file_to_supabase): Upload failed: Unexpected response structure - {response}")
             return None
         else:
             # Upload was successful, now get the public URL
             # The get_public_url method also returns an object, often with a 'data' attribute
             public_url_response = supabase_target_client.storage.from_(bucket_name).get_public_url(file_path_in_storage)
 
-            # Check for error attribute on the public_url_response object
-            if public_url_response.error: # Access 'error' as an attribute
-                error_message = public_url_response.error.message if hasattr(public_url_response.error, 'message') else "Unknown error"
-                st.error(f"Failed to get public URL: {error_message}")
-                print(f"ERROR (upload_file_to_supabase): Failed to get public URL: {error_message}")
+            # Apply the same robust error checking for public_url_response
+            if isinstance(public_url_response, dict) and public_url_response.get("error"):
+                error_obj = public_url_response["error"]
+                error_message = error_obj.get("message", "Unknown error from dict response") if isinstance(error_obj, dict) else str(error_obj)
+                st.error(f"Failed to get public URL (dict error): {error_message}")
+                print(f"ERROR (upload_file_to_supabase): Failed to get public URL (dict error): {error_message}")
+                return None
+            elif hasattr(public_url_response, 'error') and public_url_response.error:
+                error_message = public_url_response.error.message if hasattr(public_url_response.error, 'message') else "Unknown error from attribute error"
+                st.error(f"Failed to get public URL (attribute error): {error_message}")
+                print(f"ERROR (upload_file_to_supabase): Failed to get public URL (attribute error): {error_message}")
+                return None
+            elif not hasattr(public_url_response, 'data') or not public_url_response.data:
+                st.error("Public URL data not found in Supabase response.")
+                print(f"ERROR (upload_file_to_supabase): Public URL response missing data: {public_url_response}")
                 return None
             else:
                 # The public URL is typically in the 'data' attribute of the public_url_response object
                 # and then often as a 'publicUrl' key within that data.
-                # Let's be explicit and check if 'data' exists and then if 'publicUrl' is in it.
-                if hasattr(public_url_response, 'data') and public_url_response.data:
-                    # In some versions, public_url_response.data is directly the URL string.
-                    # In others, it's an object like {'publicUrl': '...'}.
-                    # We'll try to handle both.
-                    if isinstance(public_url_response.data, str):
-                        return public_url_response.data
-                    elif isinstance(public_url_response.data, dict) and 'publicUrl' in public_url_response.data:
-                        return public_url_response.data['publicUrl']
-                    else:
-                        st.error("Could not extract public URL from Supabase response.")
-                        print(f"ERROR (upload_file_to_supabase): Unexpected public URL response data: {public_url_response.data}")
-                        return None
+                # We'll try to handle both.
+                if isinstance(public_url_response.data, str):
+                    return public_url_response.data
+                elif isinstance(public_url_response.data, dict) and 'publicUrl' in public_url_response.data:
+                    return public_url_response.data['publicUrl']
                 else:
-                    st.error("Public URL data not found in Supabase response.")
-                    print(f"ERROR (upload_file_to_supabase): Public URL response missing data: {public_url_response}")
+                    st.error("Could not extract public URL from Supabase response (unexpected data type).")
+                    print(f"ERROR (upload_file_to_supabase): Unexpected public URL response data type: {public_url_response.data}")
                     return None
 
     except Exception as e:
@@ -1084,14 +1100,25 @@ def delete_file_from_supabase_storage(file_path_in_storage, user_uid_for_deletio
             print("DEBUG (delete_file_from_supabase_storage): Using regular client for user deletion.")
 
         # Perform the removal. The remove method expects a list of file paths.
-        # It returns an object with 'data' and 'error' as attributes.
+        # This is the most robust way to handle varying response types:
         response = supabase_target_client.storage.from_(bucket_name).remove([file_path_in_storage])
 
-        # Check for error attribute on the response object
-        if response.error: # Access 'error' as an attribute
-            error_message = response.error.message if hasattr(response.error, 'message') else "Unknown error"
-            st.error(f"Supabase Storage deletion failed: {error_message}")
-            print(f"ERROR (delete_file_from_supabase_storage): Deletion failed: {error_message}")
+        # First, check if the response object itself indicates an error
+        if isinstance(response, dict) and response.get("error"):
+            error_obj = response["error"]
+            error_message = error_obj.get("message", "Unknown error from dict response") if isinstance(error_obj, dict) else str(error_obj)
+            st.error(f"Supabase Storage deletion failed (dict error): {error_message}")
+            print(f"ERROR (delete_file_from_supabase_storage): Deletion failed (dict error): {error_message}")
+            return False
+        elif hasattr(response, 'error') and response.error:
+            error_message = response.error.message if hasattr(response.error, 'message') else "Unknown error from attribute error"
+            st.error(f"Supabase Storage deletion failed (attribute error): {error_message}")
+            print(f"ERROR (delete_file_from_supabase_storage): Deletion failed (attribute error): {error_message}")
+            return False
+        elif not hasattr(response, 'data') or not response.data:
+            # This covers cases where there's no explicit error, but also no data (indicating failure)
+            st.error("Supabase Storage deletion failed: No data returned and no explicit error.")
+            print(f"ERROR (delete_file_from_supabase_storage): Deletion failed: Unexpected response structure - {response}")
             return False
         else:
             # If no error, the deletion was successful.
