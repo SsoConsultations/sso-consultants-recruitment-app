@@ -987,63 +987,113 @@ def upload_jd_cv_page():
 
 # --- Supabase Storage & Database Functions ---
 
-def upload_file_to_supabase(file_bytes, file_name, user_uid): # MODIFIED: Added user_uid parameter
-    """Uploads a file to Supabase Storage and returns its public URL.
-    Uses service_role client if user_uid is 'admin_special_uid'."""
+def upload_file_to_supabase(file_bytes, file_name, user_uid):
+    """
+    Uploads a file to Supabase Storage and returns its public URL.
+    Uses service_role client if user_uid is 'admin_special_uid'.
+    """
     try:
-        bucket_name = "app-files" # MODIFIED: Ensure this bucket exists in your Supabase Storage (using underscore)
+        bucket_name = "app-files" # MODIFIED: Ensure this bucket exists in your Supabase Storage
         # Use a unique path for each file, including user_uid for organization
         file_path_in_storage = f"jd_cv_reports/{user_uid}/{file_name}"
 
-        # ADDED: Determine which client to use for upload (regular for users, service_role for hardcoded admin)
+        # Determine which client to use for upload (regular for users, service_role for hardcoded admin)
         if user_uid == "admin_special_uid":
+            # Ensure 'supabase_service_role_client' is properly initialized in st.session_state
+            if 'supabase_service_role_client' not in st.session_state:
+                st.error("Supabase service role client not initialized.")
+                return None
             supabase_target_client = st.session_state['supabase_service_role_client']
             print("DEBUG (upload_file_to_supabase): Using service role client for hardcoded admin upload.")
         else:
+            # Ensure 'supabase_client' is properly initialized in st.session_state
+            if 'supabase_client' not in st.session_state:
+                st.error("Supabase client not initialized.")
+                return None
             supabase_target_client = st.session_state['supabase_client']
             print("DEBUG (upload_file_to_supabase): Using regular client for user upload.")
 
-        # MODIFIED: Use the determined client for upload
-        response = supabase_target_client.storage.from_(bucket_name).upload(file_path_in_storage, file_bytes)
+        # Perform the upload
+        # The upload method returns a dictionary with 'data' and 'error' keys.
+        response = supabase_target_client.storage.from_(bucket_name).upload(
+            file_path_in_storage,
+            file_bytes,
+            # You might want to add content-type here if known, e.g., {"content-type": "application/pdf"}
+            # For this example, we'll assume it's handled or not strictly necessary for simple files.
+            # However, for proper browser handling, it's recommended.
+            # Example: options={"contentType": "application/octet-stream"}
+        )
 
-        if response.status_code in [200, 201]: # 200 for existing, 201 for new
-            # Get public URL
-            public_url_response = supabase_target_client.storage.from_(bucket_name).get_public_url(file_path_in_storage)
-            return public_url_response
-        else:
-            st.error(f"Supabase Storage upload failed: {response.status_code} - {response.json()}")
-            print(f"ERROR (upload_file_to_supabase): Upload failed: {response.status_code} - {response.json()}")
+        # Check if there's an error in the response
+        if response.get("error"):
+            error_message = response["error"].get("message", "Unknown error")
+            st.error(f"Supabase Storage upload failed: {error_message}")
+            print(f"ERROR (upload_file_to_supabase): Upload failed: {error_message}")
             return None
+        else:
+            # Upload was successful, now get the public URL
+            # The get_public_url method also returns a dictionary with 'data' and 'error'
+            public_url_response = supabase_target_client.storage.from_(bucket_name).get_public_url(file_path_in_storage)
+
+            if public_url_response.get("error"):
+                error_message = public_url_response["error"].get("message", "Unknown error")
+                st.error(f"Failed to get public URL: {error_message}")
+                print(f"ERROR (upload_file_to_supabase): Failed to get public URL: {error_message}")
+                return None
+            else:
+                # The public URL is directly in public_url_response['data']
+                return public_url_response['data'] # This will be the actual URL string
+
     except Exception as e:
-        st.error(f"Error uploading file to Supabase Storage: {e}")
-        print(f"ERROR (upload_file_to_supabase): {e}")
+        st.error(f"An unexpected error occurred during file upload to Supabase Storage: {e}")
+        print(f"ERROR (upload_file_to_supabase): Unexpected error: {e}")
         return None
 
-def delete_file_from_supabase_storage(file_path_in_storage, user_uid_for_deletion_check): # MODIFIED: Added user_uid_for_deletion_check parameter
-    """Deletes a file from Supabase Storage.
-    Uses service_role client if user_uid_for_deletion_check is 'admin_special_uid'."""
+def delete_file_from_supabase_storage(file_path_in_storage, user_uid_for_deletion_check):
+    """
+    Deletes a file from Supabase Storage.
+    Uses service_role client if user_uid_for_deletion_check is 'admin_special_uid'.
+    """
     try:
-        bucket_name = "app-files" # MODIFIED: Using underscore
+        bucket_name = "app-files" # Ensure this bucket exists in your Supabase Storage
 
-        # ADDED: Determine which client to use for deletion
+        # Determine which client to use for deletion
         if user_uid_for_deletion_check == "admin_special_uid":
+            # Ensure 'supabase_service_role_client' is properly initialized in st.session_state
+            if 'supabase_service_role_client' not in st.session_state:
+                st.error("Supabase service role client not initialized for deletion.")
+                return False
             supabase_target_client = st.session_state['supabase_service_role_client']
             print("DEBUG (delete_file_from_supabase_storage): Using service role client for admin deletion.")
         else:
+            # Ensure 'supabase_client' is properly initialized in st.session_state
+            if 'supabase_client' not in st.session_state:
+                st.error("Supabase client not initialized for deletion.")
+                return False
             supabase_target_client = st.session_state['supabase_client']
             print("DEBUG (delete_file_from_supabase_storage): Using regular client for user deletion.")
 
-        # MODIFIED: Use the determined client for removal
+        # Perform the removal. The remove method expects a list of file paths.
+        # It returns a dictionary with 'data' and 'error' keys.
         response = supabase_target_client.storage.from_(bucket_name).remove([file_path_in_storage])
-        if response.status_code == 200:
-            return True
-        else:
-            print(f"ERROR (delete_file_from_supabase_storage): Delete failed: {response.status_code} - {response.json()}")
-            return False
-    except Exception as e:
-        print(f"ERROR (delete_file_from_supabase_storage): {e}")
-        return False
 
+        # Check if there's an error in the response
+        if response.get("error"):
+            error_message = response["error"].get("message", "Unknown error")
+            st.error(f"Supabase Storage deletion failed: {error_message}")
+            print(f"ERROR (delete_file_from_supabase_storage): Deletion failed: {error_message}")
+            return False
+        else:
+            # If no error, the deletion was successful.
+            # The 'data' key might contain a list of objects with 'name' and 'id' of deleted files.
+            print(f"DEBUG (delete_file_from_supabase_storage): File(s) successfully deleted: {response.get('data')}")
+            return True
+
+    except Exception as e:
+        st.error(f"An unexpected error occurred during file deletion from Supabase Storage: {e}")
+        print(f"ERROR (delete_file_from_supabase_storage): Unexpected error: {e}")
+        return False
+        
 def save_report_on_download(filename, docx_buffer, ai_result, jd_original_name, cv_original_names):
     """Saves the report to Supabase Storage and 'jd_cv_reports' table metadata."""
     st.info("Attempting to save report to cloud... (This message will disappear shortly)")
